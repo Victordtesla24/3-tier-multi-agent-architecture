@@ -46,6 +46,7 @@ def l2_sub_agent_node(state: ArchitectState) -> Dict:
             # Simulate L3 generation and L2 strict validation
             results[str(task["id"])] = L2ValidationResult(
                 is_valid=True,
+                feedback="Success",
                 compiled_artifact="def execute(): pass"
             )
     return {"l2_results": results}
