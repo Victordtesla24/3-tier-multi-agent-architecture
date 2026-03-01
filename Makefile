@@ -2,7 +2,7 @@
 
 install:
 	@command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh
-	export UV_PROJECT_ENVIRONMENT=/tmp/.venv-antigravity && export UV_CACHE_DIR=/tmp/uv-cache && uv sync
+	export UV_PROJECT_ENVIRONMENT=/tmp/.venv-antigravity && export UV_CACHE_DIR=/tmp/uv-cache && uv sync --all-extras
 
 test-pytest:
 	pytest tests/ -v

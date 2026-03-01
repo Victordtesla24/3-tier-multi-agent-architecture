@@ -90,7 +90,7 @@ command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh
 export PATH="$HOME/.cargo/bin:$PATH"
 export UV_PROJECT_ENVIRONMENT=/tmp/.venv-antigravity
 export UV_CACHE_DIR=/tmp/uv-cache
-uv sync -q || echo -e "${RED}⚠️ Uv sync failure detected. Continuing with caution.${NC}"
+uv sync --all-extras -q || echo -e "${RED}⚠️ Uv sync failure detected. Continuing with caution.${NC}"
 
 python3 src/engine/config_manager.py "$GEMINI_CONF"
 
