@@ -71,23 +71,8 @@ if [ ! -f "$GEMINI_CONF" ]; then
     touch "$GEMINI_CONF"
 fi
 
-# Function to safely append robust execution configuration
-apply_config() {
-    local key="$1"
-    local value="$2"
-    if ! grep -q "^${key}:" "$GEMINI_CONF"; then
-        echo "${key}: ${value}" >> "$GEMINI_CONF"
-        echo -e "  ↳ Configured: $key"
-    else
-        sed -i "" "s|^${key}:.*|${key}: ${value}|g" "$GEMINI_CONF"
-        echo -e "  ↳ Re-verified & Updated: $key"
-    fi
-}
-
-apply_config "orchestration_entry" ".agent/workflows/3-tier-orchestration.md"
-apply_config "default_model" "Gemini 3.1 Pro Preview"
-apply_config "startup_hook" ".agent/rules/system-verification-agent.md"
-apply_config "new_chat_hook" ".agent/rules/system-verification-agent.md"
+# Function to safely append robust execution configuration using atomic python merger
+python3 src/engine/config_manager.py "$GEMINI_CONF"
 
 echo -e "${GREEN}✅ Global hooks flawlessly registered. Continuous execution securely verified.${NC}"
 
