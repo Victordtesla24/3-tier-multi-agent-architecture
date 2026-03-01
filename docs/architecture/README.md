@@ -15,17 +15,27 @@ The fundamental objective of this architecture is to guarantee **maximum executi
 
 ---
 
-## ⚡️ Quick Start & Activation Verification
+## 📦 Installation & Setup
 
-The **3-Tier Multi-Agent Architecture** is an `always_on`, deterministic orchestration pipeline operating natively within the Antigravity IDE. It enforces rigorous standards, zero-placeholder code execution, and single-source-of-truth file management.
+To securely deploy the architecture into your local Antigravity IDE environment, natively clone the repository and autonomously execute the setup script. This script executes entirely as-is without requiring manual code modifications.
 
-### How to verify it is running:
-1. **Start a New Chat**: Open a new conversation in the Antigravity IDE.
-2. **Visual Confirmation**: Before you even type a prompt, the System Initialization & Verification Agent will print the following exact message at the top of the interface:
-   ```markdown
-   # 3-tier multi-agent-architecture: ON
-   ```
-3. **Execution**: Simply type your prompt. The system intercepts it and automatically begins the architecture pipeline.
+```bash
+# 1. Clone the repository into your desired project directory
+git clone https://github.com/Victordtesla24/3-tier-multi-agent-architecture.git
+cd 3-tier-multi-agent-architecture
+
+# 2. Make the installation script executable
+chmod +x install.sh
+
+# 3. Run the autonomous installer
+./install.sh
+```
+
+### What `install.sh` Does Automatically:
+- **Detects Antigravity IDE**: Validates that your MacBook Pro M5 environment natively supports the IDE.
+- **Validates & Recreates Files**: Scans `.agent/` and `docs/` folders natively. IF files DO NOT EXIST or were maliciously deleted, it actively **RECREATES THEM** using the secure repository index as the hardened source of truth.
+- **Re-verifies Implementation**: Automatically re-checks, re-validates, and securely hardwires the architecture execution hooks securely into your core Antigravity engine configuration.
+- **Confirms Status Message**: Explicitly guarantees the exact `# 3-tier multi-agent-architecture: ON` status message is definitively printed on every new chat conversation.
 
 ---
 
