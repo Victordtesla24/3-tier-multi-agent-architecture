@@ -65,10 +65,23 @@ fi
 
 # 3. Apply Global Antigravity Configurations
 echo -e "\n${YELLOW}[3/4] Re-verifying & Registering Implementation with the Antigravity Engine...${NC}"
+
+# Explicit user warning before system modification
+read -p "⚠️  Warning: This script will modify your system configuration at $GEMINI_DIR. Proceed? [y/N] " response
+if [[ ! "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+    echo -e "${RED}Installation gracefully aborted by user.${NC}"
+    exit 0
+fi
+
 GEMINI_CONF="$GEMINI_DIR/GEMINI.md"
 
 if [ ! -f "$GEMINI_CONF" ]; then
     touch "$GEMINI_CONF"
+else
+    # Safety: Timestamped atomic backup prior to any modification
+    BACKUP_PATH="${GEMINI_CONF}.backup.$(date +%s)"
+    cp "$GEMINI_CONF" "$BACKUP_PATH"
+    echo -e "${GREEN}✅ System configuration backup secured at: $BACKUP_PATH${NC}"
 fi
 
 # Function to safely append robust execution configuration using atomic python merger

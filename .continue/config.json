@@ -1,0 +1,10 @@
+{
+    "models": [
+        {
+            "title": "Gemini 3.1 Pro Preview",
+            "provider": "google",
+            "model": "gemini-3.1-pro-preview"
+        }
+    ],
+    "systemMessage": "You are part of a 3-Tier Multi-Agent Architecture. You must strictly abide by the Zero-Tolerance policy regarding simulated code and placeholder text. When triggered, generate mathematically complete code fulfilling 100% of the bounded constraints."
+}

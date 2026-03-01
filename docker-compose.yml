@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: antigravity_langgraph_engine
+    volumes:
+      - .:/opt/antigravity
+      - ~/.gemini/.agent/memory:/root/.agent/memory
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    command: python src/python/langgraph_orchestrator.py
+    restart: unless-stopped

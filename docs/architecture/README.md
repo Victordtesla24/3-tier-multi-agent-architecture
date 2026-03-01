@@ -15,27 +15,50 @@ The fundamental objective of this architecture is to maximize execution accuracy
 
 ---
 
-## 📦 Installation & Setup
+## 🛠 Installation & Setup
 
-To securely deploy the architecture into your local Antigravity IDE environment, natively clone the repository and autonomously execute the setup script. This script executes entirely as-is without requiring manual code modifications.
+This architecture intrinsically supports two primary execution modes: **Native IDE Integration** and **Standalone Python Execution**.
 
-```bash
-# 1. Clone the repository into your desired project directory
-git clone https://github.com/Victordtesla24/3-tier-multi-agent-architecture.git
-cd 3-tier-multi-agent-architecture
+### Mode 1: Standalone Python (Docker / Recommended)
+Eliminates lock-in and allows execution via deterministic `LangGraph` agents on any CI/CD or CLI environment.
 
-# 2. Make the installation script executable
-chmod +x install.sh
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/Victordtesla24/3-tier-multi-agent-architecture.git
+   cd 3-tier-multi-agent-architecture
+   ```
+2. **Execute via Docker Compose:**
+   ```bash
+   # Requires OPENAI_API_KEY or ANTHROPIC_API_KEY exported in your environment
+   docker-compose up --build
+   ```
+3. **Execute via Python CLI:**
+   ```bash
+   make install
+   python src/python/langgraph_orchestrator.py
+   ```
 
-# 3. Run the autonomous installer
-./install.sh
-```
+### Mode 2: Native Antigravity IDE Integration
+Hooks dynamically into the `.gemini` runtime on your device.
 
-### What `install.sh` Does Automatically:
-- **Detects Antigravity IDE**: Validates that your MacBook Pro M5 environment natively supports the IDE.
-- **Validates & Recreates Files**: Scans `.agent/` and `docs/` folders natively. IF files DO NOT EXIST or were maliciously deleted, it actively **RECREATES THEM** using the secure repository index as the hardened source of truth.
-- **Re-verifies Implementation**: Automatically re-checks, re-validates, and securely hardwires the architecture execution hooks securely into your core Antigravity engine configuration.
-- **Confirms Status Message**: Explicitly guarantees the exact `# 3-tier multi-agent-architecture: ON` status message is definitively printed on every new chat conversation.
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/Victordtesla24/3-tier-multi-agent-architecture.git
+   cd 3-tier-multi-agent-architecture
+   ```
+
+2. **Run the Initialization Script:**
+   The automated setup script mathematically verifies the presence of required framework files and injects deterministic execution hooks directly into the core IDE config. It automatically creates timestamped backups before applying mutations.
+   ```bash
+   chmod +x install.sh
+   ./install.sh
+   ```
+
+3. **Verify Operational Status:**
+   Restart your Antigravity IDE and start a **New Chat**. You MUST see the following activation sequence output securely at the top of the interface:
+   ```
+   # 3-tier multi-agent-architecture: ON
+   ```
 
 ---
 
