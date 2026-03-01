@@ -1,7 +1,7 @@
 .PHONY: install test test-pytest build run clean
 
 install:
-	pip install uv
+	@command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh
 	uv sync
 
 test-pytest:
