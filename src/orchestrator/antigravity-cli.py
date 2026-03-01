@@ -14,7 +14,9 @@ logger = logging.getLogger("AntigravityCLI")
 def main():
     parser = argparse.ArgumentParser(description="Standalone CLI Runner for the 3-Tier Multi-Agent Architecture")
     parser.add_argument("--prompt", type=str, required=True, help="The raw user prompt/directive to execute")
-    parser.add_argument("--workspace", type=str, default=".", help="Root directory for file system operations")
+    parser.add_argument("--workspace", type=str, default="/tmp/antigravity_workspace",
+                        help="Root directory for file system operations. Must be a writable path. "
+                             "Defaults to /tmp/antigravity_workspace for standalone CLI usage.")
     
     args = parser.parse_args()
     

@@ -2,7 +2,7 @@ import logging
 import time
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger("AntigravityEngine")
 
@@ -26,12 +26,12 @@ class OrchestrationStateMachine:
                 json.dump({"executions": []}, f)
 
     def _structured_log(self, event_type: str, details: dict):
-        """Appends structured JSON telemetry telemetry to the central memory file."""
+        """Appends structured JSON telemetry to the central memory file."""
         try:
             with open(self.log_path, 'r+') as f:
                 data = json.load(f)
                 data["executions"].append({
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                     "state": self.state,
                     "event": event_type,
                     "details": details

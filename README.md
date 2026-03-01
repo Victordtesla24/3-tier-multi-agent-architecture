@@ -39,6 +39,42 @@ chmod +x install.sh
 
 ---
 
+## ⚙️ Standalone Python CLI Mode
+
+For non-IDE environments, Docker containers, or CI/CD pipelines, you can run the orchestration engine directly:
+
+```bash
+# 1. Install dependencies
+make install
+
+# 2. Run a prompt through the full 3-tier pipeline
+# NOTE: Always specify --workspace pointing to a writable directory.
+# The default workspace is /tmp/antigravity_workspace.
+/tmp/.venv-antigravity/bin/python src/orchestrator/antigravity-cli.py \
+  --workspace /tmp/antigravity_workspace \
+  --prompt "Your objective here"
+```
+
+> **Important:** The `--workspace` flag must point to a directory you own and have write access to. The pipeline writes structured telemetry to `<workspace>/.agent/memory/execution_log.json`.
+
+```bash
+# 3. Run the full test suite
+make test-pytest
+```
+
+Expected test output:
+```
+tests/test_architecture.py::test_engine_initialization              PASSED
+tests/test_architecture.py::test_benchmark_parsing                  PASSED
+tests/test_architecture.py::test_all_benchmarks_have_input_data_tag PASSED
+tests/test_architecture.py::test_pipeline_telemetry_is_written      PASSED
+tests/test_architecture.py::test_cli_entrypoint_executes_successfully PASSED
+
+5 passed in ~0.5s
+```
+
+
+
 ## 📊 System Architecture & Data Flow
 
 The architecture operates in a strict, sequential hierarchy ensuring your prompt is reconstructed, researched, completely executed without simulated placeholders, and logged for continuous learning.

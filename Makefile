@@ -5,7 +5,7 @@ install:
 	export UV_PROJECT_ENVIRONMENT=/tmp/.venv-antigravity && export UV_CACHE_DIR=/tmp/uv-cache && uv sync --all-extras
 
 test-pytest:
-	pytest tests/ -v
+	/tmp/.venv-antigravity/bin/pytest tests/ -v
 
 test: test-pytest
 	python src/engine/config_manager.py .agent/tmp/mock_gemini.md
