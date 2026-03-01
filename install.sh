@@ -88,7 +88,9 @@ fi
 echo -e "${YELLOW}  ↳ Installing configuration dependencies...${NC}"
 command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh -q || echo -e "${RED}⚠️ uv installation failed. Continuing with caution.${NC}"
 export PATH="$HOME/.cargo/bin:$PATH"
-uv sync --cache-dir .uv-cache -q || echo -e "${RED}⚠️ Uv sync failure detected. Continuing with caution.${NC}"
+export UV_PROJECT_ENVIRONMENT=/tmp/.venv-antigravity
+export UV_CACHE_DIR=/tmp/uv-cache
+uv sync -q || echo -e "${RED}⚠️ Uv sync failure detected. Continuing with caution.${NC}"
 
 python3 src/engine/config_manager.py "$GEMINI_CONF"
 
