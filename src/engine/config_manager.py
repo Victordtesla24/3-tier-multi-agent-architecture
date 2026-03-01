@@ -6,7 +6,7 @@ from pathlib import Path
 try:
     from ruamel.yaml import YAML
 except ImportError:
-    print("CRITICAL: ruamel.yaml not installed. Please run pip install -r requirements.txt")
+    print("CRITICAL: ruamel.yaml not installed. Please run `uv sync`")
     sys.exit(1)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

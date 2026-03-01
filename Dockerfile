@@ -14,8 +14,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install python dependencies first to cache docker layers
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install uv
+COPY pyproject.toml .
+RUN uv pip install --system -e .
 
 # Copy the entire architectural blueprint and logic engine
 COPY . .

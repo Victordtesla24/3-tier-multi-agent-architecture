@@ -86,7 +86,8 @@ fi
 
 # Function to safely append robust execution configuration using atomic python merger
 echo -e "${YELLOW}  ↳ Installing configuration dependencies...${NC}"
-pip3 install -r requirements.txt -q || echo -e "${RED}⚠️ Pip failure detected. Continuing with caution.${NC}"
+pip3 install uv -q || echo -e "${RED}⚠️ Pip failure detected. Continuing with caution.${NC}"
+uv sync -q || echo -e "${RED}⚠️ Uv sync failure detected. Continuing with caution.${NC}"
 
 python3 src/engine/config_manager.py "$GEMINI_CONF"
 

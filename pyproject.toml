@@ -1,0 +1,30 @@
+[project]
+name = "my-ai-agent"
+version = "0.1.0"
+description = "Advanced agentic workflow"
+requires-python = ">=3.11"
+dependencies = [
+    "langgraph",
+    "langchain-openai",
+    "pydantic-ai",
+    "chromadb",
+    "python-dotenv",
+    "ruamel.yaml>=0.17.32",
+    "litellm>=1.15.0",
+    "pydantic>=2.4.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "black",
+    "mypy>=1.9.0",
+    "ruff>=0.3.0",
+    "pre-commit>=3.6.0"
+]
+
+[tool.uv]
+dev-dependencies = ["jupyter"]
+
+[tool.black]
+line-length = 88

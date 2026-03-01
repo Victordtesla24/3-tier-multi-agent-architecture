@@ -1,7 +1,8 @@
 .PHONY: install test test-pytest build run clean
 
 install:
-	pip install -r requirements.txt
+	pip install uv
+	uv sync
 
 test-pytest:
 	pytest tests/ -v
