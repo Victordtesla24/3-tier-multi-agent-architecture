@@ -72,6 +72,9 @@ if [ ! -f "$GEMINI_CONF" ]; then
 fi
 
 # Function to safely append robust execution configuration using atomic python merger
+echo -e "${YELLOW}  ↳ Installing configuration dependencies...${NC}"
+pip3 install -r requirements.txt -q || echo -e "${RED}⚠️ Pip failure detected. Continuing with caution.${NC}"
+
 python3 src/engine/config_manager.py "$GEMINI_CONF"
 
 echo -e "${GREEN}✅ Global hooks flawlessly registered. Continuous execution securely verified.${NC}"

@@ -1,67 +1,70 @@
-import os
 import sys
 import shutil
+import logging
+from pathlib import Path
 
-def merge_config(config_path, new_settings):
+try:
+    from ruamel.yaml import YAML
+except ImportError:
+    print("CRITICAL: ruamel.yaml not installed. Please run pip install -r requirements.txt")
+    sys.exit(1)
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger("ConfigManager")
+
+def merge_config_safely(config_path: str, new_settings: dict) -> None:
     """
-    Safely merges new settings into the GEMINI config file.
-    Backs up the existing config first to prevent data loss.
+    Safely merges new settings into the GEMINI config file using an atomic YAML parser.
+    Backs up the existing config first to prevent catastrophic data loss and preserves comments.
     """
-    if not os.path.exists(config_path):
-        # Create empty if it doesn't exist
-        open(config_path, 'w').close()
+    target_file = Path(config_path)
     
-    # Backup
-    backup_path = f"{config_path}.bak"
-    shutil.copy2(config_path, backup_path)
-    print(f"  ↳ Backup created at {backup_path}")
+    if not target_file.exists():
+        logger.info(f"Configuration file {config_path} not found. Initializing new structure.")
+        target_file.touch()
 
-    # Read existing lines
-    with open(config_path, 'r') as f:
-        lines = f.readlines()
+    # Create an atomic backup prior to destructive parsing
+    backup_path = Path(f"{config_path}.bak")
+    shutil.copy2(target_file, backup_path)
+    logger.info(f"Atomic backup created at {backup_path}")
 
-    # Apply changes
-    merged_settings = {}
-    out_lines = []
-    
-    # Process existing lines, updating values if keys match
-    for line in lines:
-        if ':' in line and not line.strip().startswith('#'):
-            key = line.split(':', 1)[0].strip()
-            if key in new_settings:
-                out_lines.append(f"{key}: {new_settings[key]}\n")
-                merged_settings[key] = True
-            else:
-                out_lines.append(line)
-        else:
-            out_lines.append(line)
+    yaml = YAML()
+    yaml.preserve_quotes = True
 
-    # Append new keys that weren't in the file
-    for key, value in new_settings.items():
-        if key not in merged_settings:
-            # Ensure proper separation
-            if out_lines and not out_lines[-1].endswith('\n\n'):
-                if not out_lines[-1].endswith('\n'):
-                    out_lines.append('\n')
+    try:
+        with open(target_file, 'r') as f:
+            data = yaml.load(f)
+            if data is None:
+                data = {}
+                
+        # Merge structurally
+        for key, value in new_settings.items():
+            data[key] = value
             
-            out_lines.append(f"{key}: {value}\n")
+        with open(target_file, 'w') as f:
+            yaml.dump(data, f)
+            
+        logger.info(f"Configuration merged and safely injected into {config_path}")
 
-    # Write back
-    with open(config_path, 'w') as f:
-        f.writelines(out_lines)
-    
-    print(f"  ↳ Configuration merged safely into {config_path}")
+    except Exception as e:
+        logger.error(f"FATAL parsing error in {config_path}. Restoring from backup. Exception: {e}")
+        shutil.copy2(backup_path, target_file)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        logger.error("Usage: python config_manager.py <path_to_gemini_md>")
+        sys.exit(1)
+        
     gemini_conf = sys.argv[1]
     
-    settings = {
+    settingsToInject = {
         "orchestration_entry": ".agent/workflows/3-tier-orchestration.md",
         "default_model": "Gemini 3.1 Pro Preview",
         "startup_hook": ".agent/rules/system-verification-agent.md",
         "new_chat_hook": ".agent/rules/system-verification-agent.md"
     }
 
-    print(f"Applying robust configuration merging...")
-    merge_config(gemini_conf, settings)
+    logger.info(f"Applying robust architectural hooks via parsed YAML...")
+    merge_config_safely(gemini_conf, settingsToInject)

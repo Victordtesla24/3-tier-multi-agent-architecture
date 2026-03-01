@@ -6,6 +6,7 @@ from pathlib import Path
 # Provide path to internal engine modules
 sys.path.append(str(Path(__file__).parent.parent))
 from engine.state_machine import OrchestrationStateMachine
+from engine.semantic_healer import ArchitectureHealer
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("AntigravityCLI")
@@ -18,6 +19,12 @@ def main():
     args = parser.parse_args()
     
     logger.info(f"Initializing Antigravity Engine in {args.workspace}")
+    
+    # Pre-execution: Semantic Auto-Healing checks
+    logger.info("Engaging Semantic Healer constraints...")
+    healer = ArchitectureHealer(args.workspace)
+    # Check a core rule dynamically before pipeline start
+    healer.validate_and_heal(".agent/rules/l1-orchestration.md")
     
     # Initialize the programmatic state machine back-end
     engine = OrchestrationStateMachine(workspace_dir=args.workspace)
