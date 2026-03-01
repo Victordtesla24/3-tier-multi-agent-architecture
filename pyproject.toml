@@ -23,8 +23,8 @@ dev = [
     "pre-commit>=3.6.0"
 ]
 
-[tool.uv]
-dev-dependencies = ["jupyter"]
+[dependency-groups]
+dev = ["jupyter"]
 
 [tool.black]
 line-length = 88

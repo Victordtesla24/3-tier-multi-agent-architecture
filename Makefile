@@ -2,7 +2,7 @@
 
 install:
 	@command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh
-	uv sync
+	uv sync --cache-dir .uv-cache
 
 test-pytest:
 	pytest tests/ -v
