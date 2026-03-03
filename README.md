@@ -177,6 +177,7 @@ The architecture operates in a strict, sequential hierarchy using CrewAI's `Proc
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#333333', 'primaryBorderColor': '#cccccc', 'lineColor': '#0056b3', 'secondaryColor': '#f4f5f7', 'tertiaryColor': '#e1e4e8'}}}%%
+flowchart TD
     %% Executive Styling
     classDef user fill:#ffffff,stroke:#0056b3,stroke-width:2px,color:#333333;
     classDef init fill:#f8f9fa,stroke:#dee2e6,stroke-width:2px,color:#333333;
@@ -267,6 +268,7 @@ If the architecture fails to execute cleanly, refer to this diagnostic flowchart
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#333333', 'primaryBorderColor': '#cccccc', 'lineColor': '#0056b3', 'secondaryColor': '#f4f5f7', 'tertiaryColor': '#e1e4e8'}}}%%
+graph TD
     %% Executive Styling
     classDef query fill:#ffffff,stroke:#0056b3,stroke-width:2px,color:#333333;
     classDef action fill:#f8f9fa,stroke:#dee2e6,stroke-width:2px,color:#333333;
