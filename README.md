@@ -113,57 +113,183 @@ The Antigravity 3-Tier Multi-Agent Architecture is a decisive leap toward total 
 
 ---
 
-## 8. Appendix: Technical Integration Guide
+## 8. Technical Integration & Installation Guide
 
 For engineering leadership directing the immediate deployment or local evaluation of the Antigravity architecture, the following streamlined protocols dictate the physical integration of the framework.
 
 ### 8.1 Core System Initialization
 
-To securely provision the architecture and align it with the necessary CrewAI dependencies, execute the following within a controlled terminal environment. The deployment utilizes `uv` for deterministic, high-velocity dependency resolution.
+
+To securely deploy the architecture into your local Antigravity IDE environment or standalone workspace:
 
 ```bash
-# 1. Acquire the foundational enterprise repository
+# 1. Clone the repository
 git clone https://github.com/Victordtesla24/3-tier-multi-agent-architecture.git
 cd 3-tier-multi-agent-architecture
 
-# 2. Resolve containerized dependencies deterministically (Required for CrewAI)
+# 2. Install dependencies via uv (Required for CrewAI)
 uv sync --all-extras
 
-# 3. Provision local credential configurations
+# 3. Setup API Keys
 cp .env.template .env
-# Edit .env to supply authorized API keys (e.g., GOOGLE_API_KEY, OPENAI_API_KEY) and specialized proxy endpoints (MINIMAX_BASE_URL)
+# Edit .env and supply your GOOGLE_API_KEY, OPENAI_API_KEY, MINIMAX_API_KEY, MINIMAX_BASE_URL, DEEPSEEK_BASE_URL, etc.
 
-# 4. Bootstrap the autonomous integration logic
+# 4. Make the integration script executable
 chmod +x scripts/integrate_crewai.sh
+
+# 5. Run the CrewAI integration & setup
 ./scripts/integrate_crewai.sh
 ```
 
-**Deployment Analytics:**
-*   **Dependency Resolution:** Resolves ~276 cryptographic packages in under 45 seconds natively on Python 3.12 architecture.
-*   **Environment Validation:** The `integrate_crewai.sh` script programmatically verifies credential viability prior to engine execution.
+### What `integrate_crewai.sh` Does Automatically:
+- **Dependency Installation**: Uses `uv` to install `crewai`, `litellm`, and related orchestration libraries into a highly optimized Python virtual environment.
+- **Environment Validation**: Checks for required keys (`GOOGLE_API_KEY` and `OPENAI_API_KEY`) within `.env`.
+- **Directory Setup**: Provisions `src/engine/` and execution script paths.
 
-### 8.2 Standalone Execution Protocol
+---
 
-For pipeline operations functioning outside of a primary IDE, the orchestration engine is accessible via a direct Command Line Interface (CLI). This mechanism is purpose-built for seamless ingestion into CI/CD pipelines (e.g., Jenkins, GitHub Actions).
+## ⚙️ Standalone Python CLI Mode
+
+For non-IDE environments, Docker containers, or CI/CD pipelines, you can run the orchestration engine directly using the `uv` environment:
 
 ```bash
-# Execute a strategic objective through the complete 3-tier CrewAI hierarchy
+# Run a prompt through the full 3-tier CrewAI pipeline
+# NOTE: Always specify --workspace pointing to a writable directory.
 export PYTHONPATH=src
 uv run python src/orchestrator/antigravity-cli.py \
   --workspace /tmp/antigravity_workspace \
-  --prompt "Initialize enterprise authentication module" \
+  --prompt "Your objective here" \
   --verbose
 ```
 
-> **Operational Constraint:** The `--workspace` parameter must target an explicitly authorized, writable directory. All structural telemetry and continuous learning matrices are continuously logged to `<workspace>/.agent/memory/execution_log.json`.
-
-### 8.3 Quality Assurance Verification
-
-To validate structural integrity post-deployment, execute the embedded, AST-gated validation suite.
+> **Important:** The `--workspace` flag must point to a directory you own and have write access to. The pipeline writes structured telemetry to `<workspace>/.agent/memory/execution_log.json`.
 
 ```bash
-# Execute the comprehensive 33-point validation matrix
+# Run the full test suite (33/33 Tests Passing ✅)
 make test-pytest
 ```
 
-*(Expected Outcome: 33/33 Tests Passing, guaranteeing CrewAI orchestration alignment and AST validation active readiness).*
+---
+
+## 📊 System Architecture & Data Flow
+
+The architecture operates in a strict, sequential hierarchy using CrewAI's `Process.hierarchical` execution, ensuring your prompt is reconstructed, researched, completely executed without simulated placeholders, and logged for continuous learning.
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#333333', 'primaryBorderColor': '#cccccc', 'lineColor': '#0056b3', 'secondaryColor': '#f4f5f7', 'tertiaryColor': '#e1e4e8'}}}%%
+    %% Executive Styling
+    classDef user fill:#ffffff,stroke:#0056b3,stroke-width:2px,color:#333333;
+    classDef init fill:#f8f9fa,stroke:#dee2e6,stroke-width:2px,color:#333333;
+    classDef core fill:#e9ecef,stroke:#ced4da,stroke-width:2px,color:#333333;
+    classDef worker fill:#ffffff,stroke:#adb5bd,stroke-width:1px,color:#333333;
+    classDef storage fill:#f8f9fa,stroke:#dee2e6,stroke-width:2px,color:#333333;
+    classDef review fill:#e9ecef,stroke:#adb5bd,stroke-width:2px,color:#333333;
+
+    %% Global Initialization
+    START(("App Startup")):::init --> VERIFY["System Verification Agent<br/>Validates .agent/ rules"]
+    VERIFY --> READY{"Environment Ready"}
+
+    %% User Interaction
+    NEW_CHAT["User Opens New Chat"]:::user --> MSG["Injects ON message"]
+    READY --> NEW_CHAT
+    MSG --> PROMPT["User Submits Raw Prompt"]:::user
+
+    %% Engine execution (State Machine -> CrewAI Orchestrator)
+    PROMPT --> ORCHESTRATOR["CrewAI Orchestrator Engine"]:::core
+    
+    %% Pipeline Execution
+    ORCHESTRATOR --> RECONSTRUCT["Prompt Reconstruction<br/>Wraps in <input_data>"]:::core
+    RECONSTRUCT --> RESEARCH["Research Agent<br/>Fetches verified sources"]:::core
+    RESEARCH --> L1["L1 Crew Manager<br/>Hierarchical Delegation"]:::core
+    
+    %% L2 / L3 Delegation
+    L1 --> L2_A["L2 Integration & Execution<br/>MiniMax m2.5 / DeepSeek"]:::worker
+    L1 --> L2_B["L2 Quality Validation<br/>MiniMax m2.5 / DeepSeek"]:::worker
+    L2_A --> L3_A["L3 Leaf Worker<br/>AST Verification: No placeholders allowed"]:::worker
+    L2_B --> L3_B["L3 Leaf Worker<br/>AST Verification: No placeholders allowed"]:::worker
+
+    %% Feedback loop
+    L3_A -- Failed SC / Simulated Code detected --> L2_A
+    L3_B -- Passed --> VALIDATION{"Output Validation"}
+    L2_A -- Passed --> VALIDATION
+
+    %% Memory and Post-processing
+    VALIDATION --> MEMORY[(".agent/memory/crewai_storage<br/>Persistent State Logging")]:::storage
+    MEMORY --> LEARNING["Continuous Learning<br/>Analyzes deployments"]:::review
+    LEARNING --> APPROVAL{User Authorization}:::user
+    APPROVAL -- "Approved" --> UPDATE[Architecture Automatically Upgrades]:::init
+    APPROVAL -- "Denied" --> END((Task Complete))
+```
+
+## 🛠 Usage Guidelines
+
+The system is designed to trigger autonomously. You do not need to invoke specific rules.
+1. **Submit your prompt**: Describe your objective.
+2. **Watch the orchestration in action**: The CrewAI Orchestrator will convert your raw input into a highly optimized, deterministic system prompt and delegate it through its Crew of specialized agents.
+3. **Review Continuous Learning Proposals**: Once a task finishes successfully, the Continuous Learning Agent evaluates the result. If it discovers pattern optimizations, it will **HALT** and prompt you with:
+   - **WHAT**: The proposed change.
+   - **WHY**: The data-backed reasoning.
+   - **HOW**: The expected benefits.
+   > **Note:** Explicitly type "Approved" or exactly match the requested authorization constraint to allow the system to apply upgrades.
+
+---
+
+## 🔍 Maintenance & Verification
+
+### How to functionally verify the architecture status:
+
+Use the Antigravity Terminal to confirm the environment configurations. It should match the blueprint exactly:
+
+```bash
+# 1. Check if the directories exist
+ls -la .agent/rules .agent/workflows .agent/tmp .agent/memory
+
+# 2. Check the Agent Manager
+antigravity status agents
+# Expected Output should include:
+# - system-verification-agent
+# - internet-research-agent
+# - l1-orchestration
+# - l2-sub-agent
+# - l3-leaf-worker
+# - continuous-learning-agent
+
+# 3. Verify the main Workflow
+antigravity workflow list
+# Should display '3-tier-orchestration.md'
+```
+
+---
+
+## ⚠️ Troubleshooting Guide
+
+If the architecture fails to execute cleanly, refer to this diagnostic flowchart:
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#333333', 'primaryBorderColor': '#cccccc', 'lineColor': '#0056b3', 'secondaryColor': '#f4f5f7', 'tertiaryColor': '#e1e4e8'}}}%%
+    %% Executive Styling
+    classDef query fill:#ffffff,stroke:#0056b3,stroke-width:2px,color:#333333;
+    classDef action fill:#f8f9fa,stroke:#dee2e6,stroke-width:2px,color:#333333;
+    classDef warning fill:#e9ecef,stroke:#ced4da,stroke-width:2px,color:#333333;
+
+    Q1{"CrewAI Initialization Errors?"}:::query
+    Q1 -- YES --> A1["Run './scripts/integrate_crewai.sh' & 'uv sync --all-extras'"]:::action
+    Q1 -- NO --> Q2{"Are API Keys missing?"}:::query
+
+    Q2 -- YES --> A2["Check '.env' file against '.env.template'.<br/>Gemini and OpenAI keys are mandatory."]:::action
+    Q2 -- NO --> Q3{"Are agents failing AST Verification?"}:::query
+
+    Q3 -- YES --> A3["Ensure L3 agents are not outputting 'pass' or 'TODO'.<br/>The orchestrator rejects placeholder logic."]:::warning
+    Q3 -- NO --> Q4{"Is FallbackLLM exhausting connection retries?"}:::query
+
+    Q4 -- YES --> A4["Verify your custom L2/L3 proxy base URLs<br/>(e.g. MINIMAX_BASE_URL) are reachable."]:::warning
+    Q4 -- NO --> OPT["System is fully operational"]:::action
+```
+
+### Common Faults & Remediations
+- **Issue**: Missing CrewAI dependencies or version conflicts.
+  - **Remediation**: Run `uv sync --all-extras`. We recommend a Python 3.12+ virtual environment to guarantee compatible pre-built wheels for underlying Rust extensions (`pydantic-core`, `tokenizers`, `tiktoken`).
+- **Issue**: AST Verification Error `Verification failed: detected banned lexical marker 'TODO'` or `AST detected empty implementation (pass)`.
+  - **Remediation**: Re-run the objective with stricter constraints against boilerplate code. The system pipeline fundamentally rejects simulated logic prior to completion.
+- **Issue**: FallbackLLM exhaustion.
+  - **Remediation**: This indicates both the primary and fallback LLMs for a particular tier failed simultaneously (e.g., API outage or bad API Key). Verify the network proxy and base URLs in your `.env`.
