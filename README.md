@@ -1,5 +1,8 @@
 # Antigravity 3-Tier Multi-Agent Architecture
 
+![Stars](https://img.shields.io/github/stars/Victordtesla24/3-tier-multi-agent-architecture?style=for-the-badge&color=8957e5)
+![License](https://img.shields.io/github/license/Victordtesla24/3-tier-multi-agent-architecture?style=for-the-badge&color=2ea043)
+![Python](https://img.shields.io/badge/python-3.12-blue?style=for-the-badge)
 ## 1. Executive Summary
 
 The Antigravity 3-Tier Multi-Agent Architecture represents a paradigm shift in autonomous, production-grade software engineering and enterprise orchestration. Designed explicitly for organizations operating at scale, this framework leverages advanced large language models (LLMs) coordinated through a deterministic, self-healing pipeline. By integrating the CrewAI orchestration layer with a proprietary tri-level agent hierarchy, the architecture ensures that complex requirements are decomposed, executed, and validated with programmatic precision.
@@ -32,7 +35,6 @@ The adoption of an autonomous multi-agent orchestration framework functions as a
 
 The system operates across a strictly regulated, three-tiered hierarchical topology. This structure governs the flow of requirements, the delegation of specialized sub-tasks, and the final assembly of production assets, eliminating the context-window exhaustion and hallucination risks inherent to flat LLM architectures.
 
-*(Placeholder: High-Fidelity Enterprise Architecture Diagram - Visualizing the Orchestration, L1, L2, and L3 relationships)*
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#333333', 'primaryBorderColor': '#cccccc', 'lineColor': '#0056b3', 'secondaryColor': '#f4f5f7', 'tertiaryColor': '#e1e4e8'}}}%%
@@ -133,6 +135,7 @@ uv sync --all-extras
 # 3. Setup API Keys
 cp .env.template .env
 # Edit .env and supply your GOOGLE_API_KEY, OPENAI_API_KEY, MINIMAX_API_KEY, MINIMAX_BASE_URL, DEEPSEEK_BASE_URL, etc.
+# Optionally set CREWAI_STORAGE_DIR (defaults to <workspace>/.agent/memory/crewai_storage).
 
 # 4. Make the integration script executable
 chmod +x scripts/integrate_crewai.sh
@@ -165,8 +168,12 @@ uv run python src/orchestrator/antigravity-cli.py \
 > **Important:** The `--workspace` flag must point to a directory you own and have write access to. The pipeline writes structured telemetry to `<workspace>/.agent/memory/execution_log.json`.
 
 ```bash
-# Run the full test suite (33/33 Tests Passing ✅)
+# Run the full test suite
 make test-pytest
+
+# Run the benchmark harness
+make benchmark
+# Results are saved to docs/benchmarks/latest_results.json and docs/benchmarks/latest_results.md
 ```
 
 ---
@@ -232,6 +239,32 @@ The system is designed to trigger autonomously. You do not need to invoke specif
    - **WHY**: The data-backed reasoning.
    - **HOW**: The expected benefits.
    > **Note:** Explicitly type "Approved" or exactly match the requested authorization constraint to allow the system to apply upgrades.
+
+---
+
+## 📊 Benchmarks
+
+The architecture includes a reproducible benchmark harness under `benchmarks/run_benchmark.py`. It measures pipeline latency and success rate using deterministic fixtures.
+
+```bash
+make benchmark
+```
+
+Results are persisted as versioned artifacts:
+- **JSON**: `docs/benchmarks/latest_results.json`
+- **Markdown**: `docs/benchmarks/latest_results.md`
+
+> See the [benchmark harness source](benchmarks/run_benchmark.py) for methodology details.
+
+---
+
+## 🧪 Experimental Modules
+
+The `src/experimental/` directory contains non-canonical orchestrator implementations retained for reference:
+
+- **LangGraph Orchestrator** (`src/experimental/langgraph/`): The initial prototype, superseded by the CrewAI-backed orchestrator. See its [README](src/experimental/langgraph/README.md) for details.
+
+> These modules are **not used** by the CLI, Docker, or CI.
 
 ---
 

@@ -55,6 +55,8 @@ Icon
 *.swo
 
 # Project specific
-scripts/
 .agent/tmp/
 .agent/memory/
+
+# Generated benchmark output
+docs/benchmarks/latest_results.json

@@ -11,7 +11,7 @@ class ThinkingEffort:
     """Thinking effort levels mapped to temperature"""
     LOW = 0.9
     MEDIUM = 0.5 
-    HIGH = 0.3
+    HIGH = 0.25
     XHIGH = 0.1
 
 

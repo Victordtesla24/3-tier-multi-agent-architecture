@@ -34,6 +34,8 @@ jobs:
 
       - name: Test Orchestration Engine and Benchmarks
         run: |
+          pytest tests/ --collect-only -q > /tmp/collect.txt || true
+          if grep -qi "no tests collected" /tmp/collect.txt || grep -qi "error" /tmp/collect.txt; then echo "Error: No tests collected or collection failed!"; exit 1; fi
           pytest tests/ -v
 
       - name: Build Docker Image

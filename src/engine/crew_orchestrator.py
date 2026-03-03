@@ -52,6 +52,18 @@ class CrewAIThreeTierOrchestrator:
             return m.group(1).strip()
         return raw_prompt.strip()
 
+    def _sanitize_prompt(self, payload: str) -> str:
+        """
+        Applies basic input sanitization to strip potential system prompt injection attacks.
+        """
+        # Remove common override keywords to prevent malicious steering
+        sanitized = re.sub(r"(?i)\b(ignore previous instructions|you are now|system prompt|bypass|override)\b", "[REDACTED]", payload)
+        
+        # Remove raw HTML script tags to prevent any XSS-style logic injections downstream
+        sanitized = re.sub(r"(?i)<script.*?>.*?</script>", "[REMOVED SCRIPT]", sanitized, flags=re.DOTALL)
+        
+        return sanitized.strip()
+
     def reconstruct_prompt(self, raw_prompt: str) -> str:
         """
         Executes the Prompt Reconstruction Protocol as a CrewAI task using Level 1 models.
@@ -64,7 +76,8 @@ class CrewAIThreeTierOrchestrator:
             )
 
         template = template_path.read_text(encoding="utf-8")
-        payload = self._extract_input_data(raw_prompt)
+        raw_payload = self._extract_input_data(raw_prompt)
+        payload = self._sanitize_prompt(raw_payload)
         reconstruction_prompt = template.replace("{{INPUT_DATA}}", payload)
 
         agent = Agent(

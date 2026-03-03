@@ -1,29 +1,25 @@
-FROM python:3.11-slim
+FROM python:3.12-slim
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
-ENV WORKSPACE_DIR /opt/antigravity
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app/src
 
-WORKDIR $WORKSPACE_DIR
+# Install uv for deterministic dependency resolution and curl
+RUN apt-get update && apt-get install -y curl build-essential git && \
+    curl -LsSf https://astral.sh/uv/install.sh | sh && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install OS dependencies required for ruamel.yaml and Git manipulation
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
+ENV PATH="/root/.local/bin:$PATH"
 
-# Install python dependencies first to cache docker layers
-RUN pip install uv
-COPY pyproject.toml .
-RUN uv pip install --system -e .
+WORKDIR /app
 
-# Copy the entire architectural blueprint and logic engine
+# Copy the dependency files first to leverage Docker layer caching
+COPY pyproject.toml uv.lock ./
+
+# Install project dependencies
+RUN uv sync --all-extras --frozen
+
+# Copy the rest of the architecture
 COPY . .
 
-# Initialize the architecture scaffolding natively
-RUN mkdir -p .agent/rules .agent/workflows .agent/tmp .agent/memory docs/architecture
-
-# Set entrypoint to the Python CLI orchestrator
-ENTRYPOINT ["python", "src/orchestrator/antigravity-cli.py"]
-CMD ["--help"]
+# Set entrypoint to use uv run
+ENTRYPOINT ["uv", "run", "python", "src/orchestrator/antigravity-cli.py"]

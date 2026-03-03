@@ -33,3 +33,7 @@ dev = ["jupyter"]
 
 [tool.black]
 line-length = 88
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = [".git", ".venv", "node_modules", "__pycache__", ".pytest_cache"]
