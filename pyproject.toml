@@ -1,16 +1,21 @@
 [project]
-name = "my-ai-agent"
-version = "0.1.0"
-description = "Advanced agentic workflow"
+name = "antigravity-3tier-crewai"
+version = "2.0.0"
+description = "3-Tier Multi-Agent Architecture with CrewAI Integration"
 requires-python = ">=3.11"
 dependencies = [
-    "langgraph",
-    "langchain-openai",
-    "pydantic-ai",
-    "chromadb",
-    "python-dotenv",
+    "crewai[openai]>=0.80.0",
+    "crewai[litellm]>=0.80.0",
+    "crewai-tools",
+    "langgraph>=0.2.0",
+    "langchain-openai>=0.2.0",
+    "pydantic-ai>=0.0.13",
+    "chromadb>=0.5.0",
+    "python-dotenv>=1.0.0",
     "ruamel.yaml>=0.17.32",
-    "litellm>=1.15.0",
+    "litellm>=1.15.0,<1.74",
+    "tokenizers>=0.21.0",
+    "tiktoken>=0.9.0",
     "pydantic>=2.4.0"
 ]
 
