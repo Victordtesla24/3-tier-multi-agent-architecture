@@ -1,83 +1,90 @@
-# 🌌 Antigravity 3-Tier Multi-Agent Architecture
+# 🌌 Antigravity 3-Tier Multi-Agent Architecture (Powered by CrewAI)
 
 > **A Production-Grade, Self-Healing, and Continuously Learning Execution Engine**
-> Version 1.1 | Target: Google Gemini 3.1 Pro Preview | Platform: Darwin arm64 (MacBook Pro M5)
+> Version 2.0.0 | Target: Google Gemini 3.1 Pro Preview, OpenAI, MiniMax, DeepSeek | Platform: Darwin arm64
 
 ---
 
 ## 🎯 Purpose & Description
 
 ### Description
-The Antigravity 3-Tier Multi-Agent Architecture is a deterministically structured, highly optimized orchestration system operating natively within the Antigravity IDE (and via standalone CLI). It leverages a rigorous, specialized hierarchy of agents (Prompt Reconstruction, Research, Orchestration, Sub-Agents, and Leaf Workers) bound by strict operational constraints to autonomously decompose and fulfill complex user requests. It explicitly orchestrates complex file management, script execution, and document formatting by integrating a **1:1 Requirement-to-Instruction mapping Protocol**, driving toward maximum practical execution integrity across the entire project pipeline.
+The Antigravity 3-Tier Multi-Agent Architecture is a deterministically structured, highly optimized orchestration system operating natively within the Antigravity IDE (and via standalone CLI). Upgraded in v2.0.0 to leverage **CrewAI**, it utilizes a rigorous, specialized hierarchy of agents (Prompt Reconstruction, Research, Orchestration, Sub-Agents, and Leaf Workers) bound by strict operational constraints to autonomously decompose and fulfill complex user requests. 
+
+It explicitly orchestrates complex file management, script execution, and document formatting by integrating a **1:1 Requirement-to-Instruction mapping Protocol**, driving toward maximum practical execution integrity across the entire project pipeline.
 
 ### Purpose
-The fundamental objective of this architecture is to maximize execution accuracy through deterministic pipelines and programmatic self-correction mechanisms. By enforcing a single source of truth, an absolute zero-tolerance policy for simulated code (enforced by code verification scaffolds), and a continuous self-learning protocol, the system aims to attain the highest statistically probable rate of user requirements fulfillment. Its ultimate operational mandate is producing genuinely verified, production-grade assets and software that align with rigorous enterprise engineering standards.
+The fundamental objective of this architecture is to maximize execution accuracy through deterministic pipelines and programmatic self-correction mechanisms. By enforcing a single source of truth, an absolute zero-tolerance policy for simulated code (enforced by strict AST code verification scaffolds), and a continuous self-learning protocol, the system aims to attain the highest statistically probable rate of user requirements fulfillment. Its ultimate operational mandate is producing genuinely verified, production-grade assets and software that align with rigorous enterprise engineering standards.
+
+---
+
+## 🚀 CrewAI Integration & Model Matrix
+
+The architecture maps CrewAI's Agent/Task/Crew execution model onto the hierarchical pipeline. It incorporates a robust **Primary → Fallback LLM routing mechanism** with soft-failure detection to ensure system resilience.
+
+| Tier | Role | Primary Model | Fallback Model | Thinking Effort |
+|------|------|--------------|----------------|-----------------|
+| **Orchestration** | Manager/Router | Gemini 3.1 Pro Preview | GPT-5.2-Codex | High → xHigh |
+| **Level 1** | Senior/Analytical | GPT-5.2-Codex | MiniMax m2.5 | Medium |
+| **Level 2** | Execution/Worker | MiniMax m2.5 | DeepSeek v3.2 | Low |
 
 ---
 
 ## 📦 Installation & Setup
 
-To securely deploy the architecture into your local Antigravity IDE environment, natively clone the repository and autonomously execute the setup script. This script executes entirely as-is without requiring manual code modifications.
+To securely deploy the architecture into your local Antigravity IDE environment or standalone workspace:
 
 ```bash
-# 1. Clone the repository into your desired project directory
+# 1. Clone the repository
 git clone https://github.com/Victordtesla24/3-tier-multi-agent-architecture.git
 cd 3-tier-multi-agent-architecture
 
-# 2. Make the installation script executable
-chmod +x install.sh
+# 2. Install dependencies via uv (Required for CrewAI)
+uv sync --all-extras
 
-# 3. Run the autonomous installer
-./install.sh
+# 3. Setup API Keys
+cp .env.template .env
+# Edit .env and supply your GOOGLE_API_KEY, OPENAI_API_KEY, MINIMAX_API_KEY, MINIMAX_BASE_URL, DEEPSEEK_BASE_URL, etc.
+
+# 4. Make the integration script executable
+chmod +x scripts/integrate_crewai.sh
+
+# 5. Run the CrewAI integration & setup
+./scripts/integrate_crewai.sh
 ```
 
-### What `install.sh` Does Automatically:
-- **Detects Antigravity IDE**: Validates that your MacBook Pro M5 environment natively supports the IDE.
-- **Validates & Recreates Files**: Scans `.agent/` and `docs/` folders natively. IF files DO NOT EXIST or were maliciously deleted, it actively **RECREATES THEM** using the secure repository index as the hardened source of truth.
-- **Re-verifies Implementation**: Automatically re-checks, re-validates, and securely hardwires the architecture execution hooks securely into your core Antigravity engine configuration.
-- **Confirms Status Message**: Explicitly guarantees the exact `# 3-tier multi-agent-architecture: ON` status message is definitively printed on every new chat conversation.
+### What `integrate_crewai.sh` Does Automatically:
+- **Dependency Installation**: Uses `uv` to install `crewai`, `litellm`, and related orchestration libraries into a highly optimized Python virtual environment.
+- **Environment Validation**: Checks for required keys (`GOOGLE_API_KEY` and `OPENAI_API_KEY`) within `.env`.
+- **Directory Setup**: Provisions `src/engine/` and execution script paths.
 
 ---
 
 ## ⚙️ Standalone Python CLI Mode
 
-For non-IDE environments, Docker containers, or CI/CD pipelines, you can run the orchestration engine directly:
+For non-IDE environments, Docker containers, or CI/CD pipelines, you can run the orchestration engine directly using the `uv` environment:
 
 ```bash
-# 1. Install dependencies
-make install
-
-# 2. Run a prompt through the full 3-tier pipeline
+# Run a prompt through the full 3-tier CrewAI pipeline
 # NOTE: Always specify --workspace pointing to a writable directory.
-# The default workspace is /tmp/antigravity_workspace.
-/tmp/.venv-antigravity/bin/python src/orchestrator/antigravity-cli.py \
+export PYTHONPATH=src
+uv run python src/orchestrator/antigravity-cli.py \
   --workspace /tmp/antigravity_workspace \
-  --prompt "Your objective here"
+  --prompt "Your objective here" \
+  --verbose
 ```
 
 > **Important:** The `--workspace` flag must point to a directory you own and have write access to. The pipeline writes structured telemetry to `<workspace>/.agent/memory/execution_log.json`.
 
 ```bash
-# 3. Run the full test suite
+# Run the full test suite (33/33 Tests Passing ✅)
 make test-pytest
 ```
 
-Expected test output:
-```
-tests/test_architecture.py::test_engine_initialization              PASSED
-tests/test_architecture.py::test_benchmark_parsing                  PASSED
-tests/test_architecture.py::test_all_benchmarks_have_input_data_tag PASSED
-tests/test_architecture.py::test_pipeline_telemetry_is_written      PASSED
-tests/test_architecture.py::test_cli_entrypoint_executes_successfully PASSED
-
-5 passed in ~0.5s
-```
-
-
+---
 
 ## 📊 System Architecture & Data Flow
 
-The architecture operates in a strict, sequential hierarchy ensuring your prompt is reconstructed, researched, completely executed without simulated placeholders, and logged for continuous learning.
+The architecture operates in a strict, sequential hierarchy using CrewAI's `Process.hierarchical` execution, ensuring your prompt is reconstructed, researched, completely executed without simulated placeholders, and logged for continuous learning.
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#0d1117', 'primaryTextColor': '#c9d1d9', 'primaryBorderColor': '#30363d', 'lineColor': '#58a6ff', 'secondaryColor': '#161b22', 'tertiaryColor': '#21262d'}}}%%
@@ -92,24 +99,27 @@ flowchart TD
     classDef review fill:#a371f7,stroke:#d2a8ff,stroke-width:2px,color:#fff;
 
     %% Global Initialization
-    START((App Startup)):::init --> VERIFY[System Verification Agent\nValidates .agent/ rules & auto-heals missing components]
+    START((App Startup)):::init --> VERIFY[System Verification Agent\nValidates .agent/ rules]
     VERIFY --> READY{Environment Ready}
 
     %% User Interaction
-    NEW_CHAT[User Opens New Chat]:::user --> MSG[Injects: '# 3-tier multi-agent-architecture: ON']
+    NEW_CHAT[User Opens New Chat]:::user --> MSG[Injects ON message]
     READY --> NEW_CHAT
     MSG --> PROMPT[User Submits Raw Prompt]:::user
 
+    %% Engine execution (State Machine -> CrewAI Orchestrator)
+    PROMPT --> ORCHESTRATOR[CrewAI Orchestrator Engine]:::core
+    
     %% Pipeline Execution
-    PROMPT --> RECONSTRUCT[Prompt Reconstruction Protocol\nWraps in <input_data> tag]:::core
-    RECONSTRUCT --> RESEARCH[Internet Research Agent\nFetches verified sources & constraints]:::core
-    RESEARCH --> L1[L1 Orchestration Agent\nDecomposes objectives & enforces single-source-of-truth]:::core
+    ORCHESTRATOR --> RECONSTRUCT[Prompt Reconstruction\nWraps in <input_data>]:::core
+    RECONSTRUCT --> RESEARCH[Research Agent\nFetches verified sources]:::core
+    RESEARCH --> L1[L1 Crew Manager\nHierarchical Delegation]:::core
     
     %% L2 / L3 Delegation
-    L1 --> L2_A[L2 Sub-Agent: Task A]:::worker
-    L1 --> L2_B[L2 Sub-Agent: Task B]:::worker
-    L2_A --> L3_A[L3 Leaf Worker\nGenuine, publication-ready code only.\nNO placeholders allowed.]:::worker
-    L2_B --> L3_B[L3 Leaf Worker\nGenuine, publication-ready code only.\nNO placeholders allowed.]:::worker
+    L1 --> L2_A[L2 Integration & Execution\nMiniMax m2.5 / DeepSeek]:::worker
+    L1 --> L2_B[L2 Quality Validation\nMiniMax m2.5 / DeepSeek]:::worker
+    L2_A --> L3_A[L3 Leaf Worker\nAST Verification: No placeholders allowed]:::worker
+    L2_B --> L3_B[L3 Leaf Worker\nAST Verification: No placeholders allowed]:::worker
 
     %% Feedback loop
     L3_A -- Failed SC / Simulated Code detected --> L2_A
@@ -117,23 +127,11 @@ flowchart TD
     L2_A -- Passed --> VALIDATION
 
     %% Memory and Post-processing
-    VALIDATION --> MEMORY[(.agent/memory/\nPersistent State Logging)]:::storage
-    MEMORY --> LEARNING[Continuous Learning & Self-Correction Agent\nAnalyzes deployments]:::review
-    LEARNING --> APPROVAL{User Authorization\nWHAT / WHY / HOW}:::user
+    VALIDATION --> MEMORY[(.agent/memory/crewai_storage\nPersistent State Logging)]:::storage
+    MEMORY --> LEARNING[Continuous Learning\nAnalyzes deployments]:::review
+    LEARNING --> APPROVAL{User Authorization}:::user
     APPROVAL -- "Approved" --> UPDATE[Architecture Automatically Upgrades]:::init
     APPROVAL -- "Denied" --> END((Task Complete))
-
-    %% Strict Sub-graphing for clarity
-    subgraph Execution Pipeline
-        RECONSTRUCT
-        RESEARCH
-        L1
-        L2_A
-        L2_B
-        L3_A
-        L3_B
-        VALIDATION
-    end
 ```
 
 ---
@@ -142,7 +140,7 @@ flowchart TD
 
 The system is designed to trigger autonomously. You do not need to invoke specific rules.
 1. **Submit your prompt**: Describe your objective.
-2. **Watch the reconstruction**: The Prompt Reconstruction Protocol will convert your raw input into a highly optimized, deterministic system prompt.
+2. **Watch the orchestration in action**: The CrewAI Orchestrator will convert your raw input into a highly optimized, deterministic system prompt and delegate it through its Crew of specialized agents.
 3. **Review Continuous Learning Proposals**: Once a task finishes successfully, the Continuous Learning Agent evaluates the result. If it discovers pattern optimizations, it will **HALT** and prompt you with:
    - **WHAT**: The proposed change.
    - **WHY**: The data-backed reasoning.
@@ -152,6 +150,7 @@ The system is designed to trigger autonomously. You do not need to invoke specif
 ---
 
 ## 🔍 Maintenance & Verification
+
 ### How to functionally verify the architecture status:
 
 Use the Antigravity Terminal to confirm the environment configurations. It should match the blueprint exactly:
@@ -163,7 +162,7 @@ ls -la .agent/rules .agent/workflows .agent/tmp .agent/memory
 # 2. Check the Agent Manager
 antigravity status agents
 # Expected Output should include:
-# - system-verification-agent (always_on / new_chat)
+# - system-verification-agent
 # - internet-research-agent
 # - l1-orchestration
 # - l2-sub-agent
@@ -187,24 +186,24 @@ graph TD
     classDef action fill:#238636,stroke:#2ea043,stroke-width:2px,color:#fff;
     classDef warning fill:#9e6a03,stroke:#d29922,stroke-width:2px,color:#fff;
 
-    Q1{"Is the '# 3-tier multi-agent-architecture: ON'\nmessage missing in new chats?"}:::query
-    Q1 -- YES --> A1[Check GEMINI.md global registration.\nEnsure 'new_chat_hook' is set.]:::action
-    Q1 -- NO --> Q2{"Are agents failing to trigger?"}:::query
+    Q1{"CrewAI Initialization Errors?"}:::query
+    Q1 -- YES --> A1[Run './scripts/integrate_crewai.sh' & 'uv sync --all-extras']:::action
+    Q1 -- NO --> Q2{"Are API Keys missing?"}:::query
 
-    Q2 -- YES --> A2[Verify `.agent/workflows/3-tier-orchestration.md`\nis registered as 'orchestration_entry' in GEMINI.md]:::action
-    Q2 -- NO --> Q3{"Are L3 agents returning simulated code or TODOs?"}:::query
+    Q2 -- YES --> A2[Check '.env' file against '.env.template'. \nGemini and OpenAI keys are mandatory.]:::action
+    Q2 -- NO --> Q3{"Are agents failing AST Verification?"}:::query
 
-    Q3 -- YES --> A3[Check `.agent/rules/l2-sub-agent.md`.\nEnsure Directive 5 strictly rejects mock code.]:::warning
-    Q3 -- NO --> Q4{"Is the Continuous Learning Agent auto-updating without permission?"}:::query
+    Q3 -- YES --> A3[Ensure L3 agents are not outputting 'pass' or 'TODO'.\nThe orchestrator rejects placeholder logic.]:::warning
+    Q3 -- NO --> Q4{"Is FallbackLLM exhausting connection retries?"}:::query
 
-    Q4 -- YES --> A4[CRITICAL: Check `.agent/rules/continuous-learning-agent.md`.\nEnsure 'Strict Authorization Gateway' Directive 5 is fully intact.]:::warning
+    Q4 -- YES --> A4[Verify your custom L2/L3 proxy base URLs \n(e.g. MINIMAX_BASE_URL) are reachable.]:::warning
     Q4 -- NO --> OPT[System is fully operational]:::action
 ```
 
 ### Common Faults & Remediations
-- **Issue**: Missing directories or agent configuration files.
-  - **Remediation**: Restart the Antigravity App. The `System Verification Agent` is bound to `startup` and will natively reconstruct missing architecture files exactly to match `docs/architecture/multi-agent-3-level-architecture.md`.
-- **Issue**: L2 looping infinitely on L3 failure.
-  - **Remediation**: The L2 agent has a maximum retry of 3 iterations. Review the prompt parameters; the constraints may be impossible or highly conflicting.
-- **Issue**: Duplicate files proliferating in the project.
-  - **Remediation**: Ensure the L1 Orchestrator directive #9 ("STRICTLY enforce single source of truth") is present in `.agent/rules/l1-orchestration.md`. The L1 agent oversees consolidation.
+- **Issue**: Missing CrewAI dependencies or version conflicts.
+  - **Remediation**: Run `uv sync --all-extras`. We recommend a Python 3.12+ virtual environment to guarantee compatible pre-built wheels for underlying Rust extensions (`pydantic-core`, `tokenizers`, `tiktoken`).
+- **Issue**: AST Verification Error `Verification failed: detected banned lexical marker 'TODO'` or `AST detected empty implementation (pass)`.
+  - **Remediation**: Re-run the objective with stricter constraints against boilerplate code. The system pipeline fundamentally rejects simulated logic prior to completion.
+- **Issue**: FallbackLLM exhaustion.
+  - **Remediation**: This indicates both the primary and fallback LLMs for a particular tier failed simultaneously (e.g., API outage or bad API Key). Verify the network proxy and base URLs in your `.env`.
