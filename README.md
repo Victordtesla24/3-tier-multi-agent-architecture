@@ -99,36 +99,36 @@ flowchart TD
     classDef review fill:#a371f7,stroke:#d2a8ff,stroke-width:2px,color:#fff;
 
     %% Global Initialization
-    START((App Startup)):::init --> VERIFY[System Verification Agent\nValidates .agent/ rules]
-    VERIFY --> READY{Environment Ready}
+    START(("App Startup")):::init --> VERIFY["System Verification Agent<br/>Validates .agent/ rules"]
+    VERIFY --> READY{"Environment Ready"}
 
     %% User Interaction
-    NEW_CHAT[User Opens New Chat]:::user --> MSG[Injects ON message]
+    NEW_CHAT["User Opens New Chat"]:::user --> MSG["Injects ON message"]
     READY --> NEW_CHAT
-    MSG --> PROMPT[User Submits Raw Prompt]:::user
+    MSG --> PROMPT["User Submits Raw Prompt"]:::user
 
     %% Engine execution (State Machine -> CrewAI Orchestrator)
-    PROMPT --> ORCHESTRATOR[CrewAI Orchestrator Engine]:::core
+    PROMPT --> ORCHESTRATOR["CrewAI Orchestrator Engine"]:::core
     
     %% Pipeline Execution
-    ORCHESTRATOR --> RECONSTRUCT[Prompt Reconstruction\nWraps in <input_data>]:::core
-    RECONSTRUCT --> RESEARCH[Research Agent\nFetches verified sources]:::core
-    RESEARCH --> L1[L1 Crew Manager\nHierarchical Delegation]:::core
+    ORCHESTRATOR --> RECONSTRUCT["Prompt Reconstruction<br/>Wraps in <input_data>"]:::core
+    RECONSTRUCT --> RESEARCH["Research Agent<br/>Fetches verified sources"]:::core
+    RESEARCH --> L1["L1 Crew Manager<br/>Hierarchical Delegation"]:::core
     
     %% L2 / L3 Delegation
-    L1 --> L2_A[L2 Integration & Execution\nMiniMax m2.5 / DeepSeek]:::worker
-    L1 --> L2_B[L2 Quality Validation\nMiniMax m2.5 / DeepSeek]:::worker
-    L2_A --> L3_A[L3 Leaf Worker\nAST Verification: No placeholders allowed]:::worker
-    L2_B --> L3_B[L3 Leaf Worker\nAST Verification: No placeholders allowed]:::worker
+    L1 --> L2_A["L2 Integration & Execution<br/>MiniMax m2.5 / DeepSeek"]:::worker
+    L1 --> L2_B["L2 Quality Validation<br/>MiniMax m2.5 / DeepSeek"]:::worker
+    L2_A --> L3_A["L3 Leaf Worker<br/>AST Verification: No placeholders allowed"]:::worker
+    L2_B --> L3_B["L3 Leaf Worker<br/>AST Verification: No placeholders allowed"]:::worker
 
     %% Feedback loop
     L3_A -- Failed SC / Simulated Code detected --> L2_A
-    L3_B -- Passed --> VALIDATION{Output Validation}
+    L3_B -- Passed --> VALIDATION{"Output Validation"}
     L2_A -- Passed --> VALIDATION
 
     %% Memory and Post-processing
-    VALIDATION --> MEMORY[(.agent/memory/crewai_storage\nPersistent State Logging)]:::storage
-    MEMORY --> LEARNING[Continuous Learning\nAnalyzes deployments]:::review
+    VALIDATION --> MEMORY[(".agent/memory/crewai_storage<br/>Persistent State Logging")]:::storage
+    MEMORY --> LEARNING["Continuous Learning<br/>Analyzes deployments"]:::review
     LEARNING --> APPROVAL{User Authorization}:::user
     APPROVAL -- "Approved" --> UPDATE[Architecture Automatically Upgrades]:::init
     APPROVAL -- "Denied" --> END((Task Complete))
@@ -187,17 +187,17 @@ graph TD
     classDef warning fill:#9e6a03,stroke:#d29922,stroke-width:2px,color:#fff;
 
     Q1{"CrewAI Initialization Errors?"}:::query
-    Q1 -- YES --> A1[Run './scripts/integrate_crewai.sh' & 'uv sync --all-extras']:::action
+    Q1 -- YES --> A1["Run './scripts/integrate_crewai.sh' & 'uv sync --all-extras'"]:::action
     Q1 -- NO --> Q2{"Are API Keys missing?"}:::query
 
-    Q2 -- YES --> A2[Check '.env' file against '.env.template'. \nGemini and OpenAI keys are mandatory.]:::action
+    Q2 -- YES --> A2["Check '.env' file against '.env.template'.<br/>Gemini and OpenAI keys are mandatory."]:::action
     Q2 -- NO --> Q3{"Are agents failing AST Verification?"}:::query
 
-    Q3 -- YES --> A3[Ensure L3 agents are not outputting 'pass' or 'TODO'.\nThe orchestrator rejects placeholder logic.]:::warning
+    Q3 -- YES --> A3["Ensure L3 agents are not outputting 'pass' or 'TODO'.<br/>The orchestrator rejects placeholder logic."]:::warning
     Q3 -- NO --> Q4{"Is FallbackLLM exhausting connection retries?"}:::query
 
-    Q4 -- YES --> A4[Verify your custom L2/L3 proxy base URLs \n(e.g. MINIMAX_BASE_URL) are reachable.]:::warning
-    Q4 -- NO --> OPT[System is fully operational]:::action
+    Q4 -- YES --> A4["Verify your custom L2/L3 proxy base URLs<br/>(e.g. MINIMAX_BASE_URL) are reachable."]:::warning
+    Q4 -- NO --> OPT["System is fully operational"]:::action
 ```
 
 ### Common Faults & Remediations
