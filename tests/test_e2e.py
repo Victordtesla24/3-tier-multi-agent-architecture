@@ -45,26 +45,31 @@ def test_edge_case_prompt_handling(mock_workspace):
 
 
 def test_simulated_llm_failure_injection(mock_workspace):
-    """Simulated LLM failure injection to verify retry logic inside the E2E orchestrator flow."""
-    orchestrator = CrewAIThreeTierOrchestrator(workspace_dir=mock_workspace, verbose=False)
-    
+    """Verify OrchestrationStateMachine._execute_with_backoff retries transient failures.
+
+    The retry logic lives in the state machine's _execute_with_backoff method, not in
+    reconstruct_prompt directly. This test validates that layer with a controlled failure
+    injection, patching time.sleep to keep the test fast.
+    """
+    from unittest.mock import patch as _patch
+    from engine.state_machine import OrchestrationStateMachine
+
+    machine = OrchestrationStateMachine(workspace_dir=mock_workspace)
+
     call_count = {"count": 0}
-    
-    def delayed_success(*args, **kwargs):
+
+    def fails_once(*args):
         call_count["count"] += 1
         if call_count["count"] == 1:
-            raise Exception("Simulated transient API Failure")
-        return "Success on retry"
-    
-    with patch("crewai.LLM.call", side_effect=delayed_success):
-        # The prompt reconstruction forces the Orchestrator to trigger an LLM
-        # The first call will simulate a failure, and CrewAI's tenacity retry will succeed
-        try:
-            result = orchestrator.reconstruct_prompt("<input_data>test the retry logic</input_data>")
-            assert "Success on retry" in result
-        except Exception:
-            # If it doesn't retry, it fails the test
-            pytest.fail("Retry logic failed or exception leaked.")
+            raise Exception("Simulated transient API failure")
+        return "success after retry"
+
+    # Patch time.sleep to skip exponential backoff delays in tests
+    with _patch("engine.state_machine.time.sleep"):
+        result = machine._execute_with_backoff(fails_once, "arg1")
+
+    assert result == "success after retry", f"Unexpected result: {result}"
+    assert call_count["count"] == 2, f"Expected exactly 2 calls, got {call_count['count']}"
 
 
 def test_memory_telemetry_validation(mock_workspace):

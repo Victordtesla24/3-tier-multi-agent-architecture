@@ -1,76 +1,102 @@
-"""Antigravity CLI with CrewAI Integration"""
+"""Antigravity CLI — Production Entry Point for the 3-Tier Multi-Agent Architecture.
+
+Usage:
+    PYTHONPATH=src python src/orchestrator/antigravity-cli.py \\
+        --prompt "<your objective>" \\
+        --workspace /path/to/workspace \\
+        [--verbose]
+"""
 import argparse
-import sys
+import json
 import logging
+import sys
 from pathlib import Path
 
-sys.path.append(str(Path(__file__).parent.parent))
-from engine.state_machine import OrchestrationStateMachine
-from engine.semantic_healer import ArchitectureHealer
-import json
+# Ensure src/ is on the module path regardless of invocation CWD
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+from engine.semantic_healer import ArchitectureHealer
+from engine.state_machine import OrchestrationStateMachine
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
 logger = logging.getLogger("AntigravityCLI")
 
+# Project root is always two levels up from this file (src/orchestrator/ → project root)
+PROJECT_ROOT = Path(__file__).parent.parent.parent.resolve()
 
-def main():
+
+def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Antigravity 3-Tier Multi-Agent Architecture with CrewAI"
+        description="Antigravity 3-Tier Multi-Agent Architecture with CrewAI",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--prompt", required=True, help="User objective/prompt")
+    parser.add_argument("--prompt", required=True, help="User objective / prompt")
     parser.add_argument(
         "--workspace",
         default="/tmp/antigravity_workspace",
-        help="Workspace directory"
+        help="Working directory for pipeline artefacts (default: /tmp/antigravity_workspace)",
     )
-    parser.add_argument("--verbose", action="store_true", help="Verbose output")
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose CrewAI output")
 
     args = parser.parse_args()
 
-    # Initialize workspace
-    workspace = Path(args.workspace)
+    workspace = Path(args.workspace).resolve()
     workspace.mkdir(parents=True, exist_ok=True)
 
-    logger.info(f"Initializing Antigravity Engine in {workspace}")
+    logger.info(f"Initialising Antigravity Engine | workspace={workspace}")
 
     print("🌌 Antigravity 3-Tier Multi-Agent Architecture + CrewAI")
-    print(f"📁 Workspace: {workspace}")
-    print(f"🎯 Objective: {args.prompt}\n")
+    print(f"📁 Workspace : {workspace}")
+    print(f"📁 Project   : {PROJECT_ROOT}")
+    print(f"🎯 Objective : {args.prompt}\n")
 
-    # Pre-execution: Semantic Auto-Healing checks
-    logger.info("Engaging Semantic Healer constraints...")
-    healer = ArchitectureHealer(str(workspace))
-    healer.validate_and_heal(".agent/rules/l1-orchestration.md")
+    # Pre-execution: Semantic Auto-Healing — always uses PROJECT_ROOT so the
+    # architecture docs and rule templates are reliably available.
+    logger.info("Engaging Semantic Healer pre-flight checks…")
+    healer = ArchitectureHealer(str(PROJECT_ROOT))
+    rules_to_validate = [
+        ".agent/rules/l1-orchestration.md",
+        ".agent/rules/l2-implementation.md",
+        ".agent/rules/l3-leaf-worker.md",
+        ".agent/rules/system-verification-agent.md",
+    ]
+    for rule in rules_to_validate:
+        healer.validate_and_heal(rule)
 
-    # Initialize the programmatic state machine back-end
+    # Initialise the programmatic state machine back-end
     engine = OrchestrationStateMachine(workspace_dir=str(workspace))
 
-    logger.info("Starting execution pipeline...")
+    logger.info("Starting execution pipeline…")
     try:
-        result = engine.execute_pipeline(raw_prompt=args.prompt)
+        success = engine.execute_pipeline(raw_prompt=args.prompt)
 
-        # Save results
         output_file = workspace / "execution_result.json"
-        with open(output_file, "w") as f:
-            json.dump({
-                "success": result,
-                "workspace": str(workspace),
-                "prompt": args.prompt,
-            }, f, indent=2)
+        output_file.write_text(
+            json.dumps(
+                {
+                    "success": success,
+                    "workspace": str(workspace),
+                    "prompt": args.prompt,
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
 
-        if result:
+        if success:
             print(f"\n✅ Execution complete! Results saved to {output_file}")
+        else:
+            print(f"\n⚠️  Execution completed with verification failures. See {output_file}")
 
-        # Save logs
-        log_file = workspace / ".agent" / "memory" / "execution_log.json"
-        log_file.parent.mkdir(parents=True, exist_ok=True)
+        logger.info("Pipeline execution finished.")
+        return 0 if success else 1
 
-        logger.info("Pipeline executed successfully. Result bounds verified.")
-        return 0
-
-    except Exception as e:
-        logger.error(f"Critical Pipeline Failure: {str(e)}")
-        print(f"\n❌ Execution failed: {str(e)}")
+    except Exception as exc:
+        logger.error(f"Critical pipeline failure: {exc}", exc_info=True)
+        print(f"\n❌ Execution failed: {exc}")
         return 1
 
 
