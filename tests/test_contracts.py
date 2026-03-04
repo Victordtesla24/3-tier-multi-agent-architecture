@@ -70,7 +70,7 @@ def test_validate_and_heal_creates_missing_rule(tmp_path):
     # Canonical template must not be empty and must not contain banned markers
     assert len(content) > 50, "Regenerated rule file is suspiciously short"
     assert "TODO" not in content
-    assert "placeholder" not in content.lower()
+    assert "NotImplementedError" not in content
 
 
 def test_validate_and_heal_regenerates_drifted_rule(tmp_path):

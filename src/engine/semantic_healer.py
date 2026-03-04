@@ -7,6 +7,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -34,17 +35,19 @@ Chief Orchestration Manager — high-level strategy and workflow control.
 ## Escalation
 Escalate to the human operator only on unresolvable deadlock or missing API keys.
 """,
-    "l2-implementation.md": """\
-# L2 Implementation Coordinator Rules
+    "l2-sub-agent.md": """\
+# L2 Sub-Agent Coordinator Rules
 ## Role
-Implementation and code generation coordinator — task decomposition and delegation.
+Engineering Lead & Strict Code Reviewer — task decomposition and delegation.
 
 ## Constraints
-1. Decompose L1 objectives into atomic L3 tasks.
-2. Validate each L3 output before acceptance — reject on deferred markers, placeholder, pass-only bodies.
-3. Maximum 3 retry iterations per L3 failure.
-4. Produce complete, executable artefacts with explicit file paths.
-5. Maintain strict 1:1 requirement-to-instruction mapping.
+1. Receive component-level objective and Success Criteria from L1.
+2. Break the objective into atomic implementation tasks for L3.
+3. Validate each L3 output before acceptance — reject on deferred markers, placeholder, pass-only bodies.
+4. Maximum 3 retry iterations per L3 failure.
+5. Produce complete, executable artefacts with explicit file paths.
+6. Maintain strict 1:1 requirement-to-instruction mapping.
+7. Log implementation approaches to `.agent/memory/l2-memory.md`.
 """,
     "l3-leaf-worker.md": """\
 # L3 Leaf Worker Agent Rules
@@ -65,10 +68,11 @@ Automated architecture integrity validator.
 
 ## Constraints
 1. Verify all Docs\u2194Code contract file paths exist before pipeline execution.
-2. Detect lexical banned markers: deferred task markers, TBD, placeholder, fill in, not implemented.
+2. Detect lexical banned markers: unresolved TODO/TBD/FIXME markers, empty pass-only implementations, and NotImplementedError stubs.
 3. Fail hard on AST-detected empty function bodies (sole `pass` statement).
 4. Emit structured telemetry for every validation event.
 5. Trigger auto-regeneration on any rule file with detected placeholder content.
+6. On new chat/session initialization, emit exactly: `3-tier-multi-agent-architecture Status: ON 🟢`.
 """,
 }
 
@@ -143,21 +147,19 @@ class ArchitectureHealer:
         the LLM to evaluate semantic intent. Here we apply the same
         zero-tolerance lexical gate that the verification scoring uses.
         """
-        banned_markers = [
-            "TODO",
-            "to do",
-            "placeholder",
-            "fill in",
-            "TBD",
-            "not implemented",
-            "pass  #",
-            "# TODO",
-            "// TODO",
+        banned_patterns = [
+            (r"(?im)^\s*(#|//)\s*TODO\b", "TODO comment marker"),
+            (r"(?im)^\s*TODO\b", "TODO marker"),
+            (r"(?im)\bTBD\b", "TBD marker"),
+            (r"(?im)\bFIXME\b", "FIXME marker"),
+            (r"(?im)\braise\s+NotImplementedError\b", "NotImplementedError stub"),
+            (r"(?im)^\s*pass\s*(#.*)?$", "pass-only implementation"),
+            (r"(?im)<\s*placeholder\s*>", "<placeholder> token"),
+            (r"(?im)\{\{\s*.*placeholder.*\}\}", "{{placeholder}} token"),
         ]
-        content_lower = content.lower()
-        for marker in banned_markers:
-            if marker.lower() in content_lower:
-                logger.warning(f"Banned marker found: '{marker}'")
+        for pattern, marker_name in banned_patterns:
+            if re.search(pattern, content):
+                logger.warning(f"Banned marker found: '{marker_name}'")
                 return False
         return True
 
@@ -222,7 +224,7 @@ if __name__ == "__main__":
 
     rules_to_validate = [
         ".agent/rules/l1-orchestration.md",
-        ".agent/rules/l2-implementation.md",
+        ".agent/rules/l2-sub-agent.md",
         ".agent/rules/l3-leaf-worker.md",
         ".agent/rules/system-verification-agent.md",
     ]

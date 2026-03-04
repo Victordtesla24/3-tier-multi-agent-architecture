@@ -2,6 +2,7 @@ FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app/src
+ENV CREWAI_STORAGE_DIR=/app/.agent/memory/crewai_storage
 
 # Install uv for deterministic dependency resolution and curl
 RUN apt-get update && apt-get install -y curl build-essential git && \

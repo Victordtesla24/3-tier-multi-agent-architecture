@@ -6,6 +6,7 @@ from unittest.mock import patch, MagicMock
 
 sys.path.append(str(Path(__file__).parent.parent / "src"))
 from engine.crew_orchestrator import CrewAIThreeTierOrchestrator
+from engine.llm_config import ModelTier
 
 
 @pytest.fixture
@@ -110,3 +111,33 @@ def test_memory_telemetry_validation(mock_workspace):
     assert len(new_data["executions"]) == 1
     assert "learning_proposal" in new_data["executions"][0]
     assert new_data["executions"][0]["learning_proposal"]["WHAT"] == "Optimize prompt parsing"
+
+
+def test_stage_fallback_emits_telemetry(mock_workspace):
+    events = []
+    orchestrator = CrewAIThreeTierOrchestrator(
+        workspace_dir=mock_workspace,
+        verbose=False,
+        telemetry_hook=lambda event, details: events.append((event, details)),
+    )
+
+    primary = MagicMock(name="primary")
+    fallback = MagicMock(name="fallback")
+    tier = ModelTier(primary=primary, fallback=fallback)
+
+    def runner(llm):
+        if llm is primary:
+            raise RuntimeError("primary unavailable")
+        return "fallback success"
+
+    result = orchestrator._run_stage_with_tier_fallback(
+        stage_name="unit_test_stage",
+        tier_name="level1",
+        tier=tier,
+        runner=runner,
+    )
+
+    assert result == "fallback success"
+    assert events[0][0] == "FALLBACK_ATTEMPT"
+    assert events[1][0] == "FALLBACK_RESULT"
+    assert events[1][1]["status"] == "success"

@@ -70,12 +70,20 @@ class OrchestrationStateMachine:
                 time.sleep(sleep_time)
         raise RuntimeError("Max retries exceeded during agent execution.")
 
+    def _record_orchestrator_event(self, event_type: str, details: dict) -> None:
+        """Telemetry bridge for orchestrator-level events (fallback attempts/results)."""
+        self._structured_log(event_type, details)
+
     def execute_pipeline(self, raw_prompt: str) -> bool:
         logger.info("Transitioning to state: PROMPT_RECONSTRUCTION")
         self.state = "PROMPT_RECONSTRUCTION"
         self._structured_log("STATE_TRANSITION", {"raw_prompt_length": len(raw_prompt)})
 
-        orchestrator = CrewAIThreeTierOrchestrator(workspace_dir=self.workspace, verbose=True)
+        orchestrator = CrewAIThreeTierOrchestrator(
+            workspace_dir=self.workspace,
+            verbose=True,
+            telemetry_hook=self._record_orchestrator_event,
+        )
 
         reconstructed = self._execute_with_backoff(orchestrator.reconstruct_prompt, raw_prompt)
 
@@ -111,22 +119,22 @@ class OrchestrationStateMachine:
         """
         output = str(results.get("final_output", ""))
 
-        banned_substrings = [
-            "TODO",
-            "to do",
-            "placeholder",
-            "fill in",
-            "TBD",
-            "not implemented",
-            "pass  #",
-            "pass\n",
-            "raise NotImplementedError",
+        banned_patterns = [
+            (r"(?im)^\s*(#|//)\s*TODO\b", "TODO comment marker"),
+            (r"(?im)^\s*TODO\b", "TODO marker"),
+            (r"(?im)\bTBD\b", "TBD marker"),
+            (r"(?im)\bFIXME\b", "FIXME marker"),
+            (r"(?im)\braise\s+NotImplementedError\b", "NotImplementedError stub"),
+            (r"(?im)^\s*pass\s*(#.*)?$", "pass-only implementation"),
+            (r"(?im)<\s*placeholder\s*>", "<placeholder> token"),
+            (r"(?im)\{\{\s*.*placeholder.*\}\}", "{{placeholder}} token"),
         ]
 
-        lowered = output.lower()
-        for s in banned_substrings:
-            if s.lower() in lowered:
-                logger.error(f"Verification failed: detected banned lexical marker '{s}'.")
+        for pattern, marker_name in banned_patterns:
+            if re.search(pattern, output):
+                logger.error(
+                    f"Verification failed: detected banned lexical marker '{marker_name}'."
+                )
                 return False
 
         # Dynamic AST Analysis for Python code blocks

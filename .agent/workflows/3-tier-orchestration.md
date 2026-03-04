@@ -6,5 +6,5 @@ trigger: always_on
 2. Execute `.agent/rules/internet-research-agent.md` using the Reconstructed Prompt.
 3. Wait for `.agent/tmp/research-context.md` generation.
 4. Execute `.agent/rules/l1-orchestration.md` using the Reconstructed Prompt.
-5. Enact dependency validation hooks (`prepare-pr.md`, `code-review.md`, `workspace_rules.md`) upon L1 termination.
+5. Validate L1 output against success criteria and AST verification gate upon L1 termination.
 6. Execute Continuous Learning Protocol: Trigger `.agent/rules/continuous-learning-agent.md` to analyze the completed task and propose architecture enhancements. MUST pause for `WHAT/WHY/HOW` user authorization before system modification.

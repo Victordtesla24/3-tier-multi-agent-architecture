@@ -9,9 +9,37 @@ Usage:
     # or directly:
     PYTHONPATH=src python benchmarks/run_benchmark.py
 """
+import os
+import sys
+
+# ---------------------------------------------------------------------------
+# CrewAI storage redirect — MUST execute before any crewai import.
+# Mirrors the same pattern used in conftest.py and antigravity-cli.py.
+# ---------------------------------------------------------------------------
+_CREWAI_STORAGE = os.environ.get(
+    "CREWAI_STORAGE_DIR", "/tmp/crewai_benchmark_storage"
+)
+os.makedirs(_CREWAI_STORAGE, exist_ok=True)
+os.environ.setdefault("CREWAI_STORAGE_DIR", _CREWAI_STORAGE)
+os.environ.setdefault("CREWAI_HOME", _CREWAI_STORAGE)
+
+try:
+    import appdirs as _appdirs
+
+    def _patched_user_data_dir(appname=None, appauthor=None, version=None, roaming=False):
+        base = os.path.join(_CREWAI_STORAGE, "appdirs_data")
+        if appname:
+            base = os.path.join(base, appname)
+        os.makedirs(base, exist_ok=True)
+        return base
+
+    _appdirs.user_data_dir = _patched_user_data_dir
+except ImportError:
+    pass
+# ---------------------------------------------------------------------------
+
 import time
 import json
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch, MagicMock
@@ -111,9 +139,18 @@ def main():
         "results": results,
     }
 
-    # Persist results
-    out_dir = Path("docs/benchmarks")
-    out_dir.mkdir(parents=True, exist_ok=True)
+    # Persist results — resolve output dir from script location (project root)
+    project_root = Path(__file__).parent.parent.resolve()
+    out_dir = project_root / "docs" / "benchmarks"
+    try:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        # Test writability
+        (out_dir / ".write_test").touch()
+        (out_dir / ".write_test").unlink()
+    except PermissionError:
+        out_dir = Path("/tmp/antigravity_benchmarks")
+        out_dir.mkdir(parents=True, exist_ok=True)
+        print(f"  ⚠ Project dir not writable, saving results to {out_dir}")
 
     json_path = out_dir / "latest_results.json"
     with open(json_path, "w") as f:

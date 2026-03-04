@@ -14,7 +14,7 @@ integrate-crewai:
 test-audit:
 	@echo "Auditing test collection..."
 	@cd tests && PYTHONPATH=$(CURDIR)/src /tmp/.venv-antigravity/bin/pytest \
-		test_architecture.py test_crewai_integration.py test_contracts.py \
+		test_architecture.py test_crewai_integration.py test_contracts.py test_cli_runtime.py \
 		--collect-only -q -p no:cacheprovider > /tmp/collect.txt || true
 	@COUNT=$$(grep -c "::" /tmp/collect.txt || true); \
 	if [ "$$COUNT" -lt 10 ]; then \
@@ -26,7 +26,7 @@ test-audit:
 
 test-pytest: test-audit
 	cd tests && PYTHONPATH=$(CURDIR)/src /tmp/.venv-antigravity/bin/pytest \
-		test_architecture.py test_crewai_integration.py test_contracts.py \
+		test_architecture.py test_crewai_integration.py test_contracts.py test_cli_runtime.py \
 		-v -p no:cacheprovider
 
 test-e2e:
@@ -44,7 +44,7 @@ run-cli:
 
 benchmark:
 	@echo "Running execution benchmark harness..."
-	PYTHONPATH=src /tmp/.venv-antigravity/bin/python benchmarks/run_benchmark.py
+	cd /tmp && PYTHONPATH=$(CURDIR)/src /tmp/.venv-antigravity/bin/python $(CURDIR)/benchmarks/run_benchmark.py
 
 clean:
 	rm -rf /tmp/antigravity_workspace

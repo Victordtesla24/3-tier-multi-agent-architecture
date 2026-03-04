@@ -1,4 +1,3 @@
-version: '3.8'
 
 services:
   orchestrator:
@@ -8,7 +7,7 @@ services:
     container_name: antigravity_crewai_engine
     volumes:
       - .:/opt/antigravity
-      - ~/.gemini/.agent/memory:/root/.agent/memory
+      - ./.agent/memory:/root/.agent/memory
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
@@ -16,5 +15,6 @@ services:
       - MINIMAX_BASE_URL=${MINIMAX_BASE_URL:-}
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
       - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-}
+      - CREWAI_STORAGE_DIR=/app/.agent/memory/crewai_storage
     command: uv run python src/orchestrator/antigravity-cli.py --prompt "System Initialization Check" --workspace /opt/antigravity
     restart: unless-stopped

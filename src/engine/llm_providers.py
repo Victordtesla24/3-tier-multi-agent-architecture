@@ -27,7 +27,7 @@ class LLMProvider:
     """Central LLM provider configuration — single LLM instances without FallbackLLM wrapper.
 
     Used by crew_agents.py for direct agent LLM assignment.
-    For FallbackLLM-wrapped tiers, use llm_config.build_model_matrix().
+    For tiered primary/fallback model selection, use llm_config.build_model_matrix().
     """
 
     @staticmethod

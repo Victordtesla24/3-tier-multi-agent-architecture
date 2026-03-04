@@ -6,16 +6,60 @@ Usage:
         --workspace /path/to/workspace \\
         [--verbose]
 """
+import os
+import sys
+from pathlib import Path
+
+# ---------------------------------------------------------------------------
+# CrewAI storage redirect — MUST execute before any crewai import.
+# CrewAI's db_storage_path() runs at class-definition time and calls
+# appdirs.user_data_dir() which on macOS resolves to
+# ~/Library/Application Support/. On restricted filesystems, mkdir there
+# fails with PermissionError. We redirect all storage to a writable path.
+# ---------------------------------------------------------------------------
+_CREWAI_STORAGE = os.environ.get(
+    "CREWAI_STORAGE_DIR", "/tmp/crewai_cli_storage"
+)
+os.makedirs(_CREWAI_STORAGE, exist_ok=True)
+os.environ.setdefault("CREWAI_STORAGE_DIR", _CREWAI_STORAGE)
+os.environ.setdefault("CREWAI_HOME", _CREWAI_STORAGE)
+
+try:
+    import appdirs as _appdirs
+
+    _orig_user_data_dir = _appdirs.user_data_dir
+
+    def _patched_user_data_dir(appname=None, appauthor=None, version=None, roaming=False):
+        base = os.path.join(_CREWAI_STORAGE, "appdirs_data")
+        if appname:
+            base = os.path.join(base, appname)
+        os.makedirs(base, exist_ok=True)
+        return base
+
+    _appdirs.user_data_dir = _patched_user_data_dir
+except ImportError:
+    pass
+
+# Patch pathlib.Path.is_file to bypass macOS Sandbox PermissionError 
+# triggered by Pydantic's BaseSettings looking for .env in restricted directories.
+_orig_is_file = Path.is_file
+def _patched_is_file(self):
+    try:
+        return _orig_is_file(self)
+    except PermissionError:
+        return False
+Path.is_file = _patched_is_file
+# ---------------------------------------------------------------------------
+
 import argparse
 import json
 import logging
-import sys
-from pathlib import Path
 
 # Ensure src/ is on the module path regardless of invocation CWD
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from engine.semantic_healer import ArchitectureHealer
+from engine.status_banner import emit_status_banner
 from engine.state_machine import OrchestrationStateMachine
 
 logging.basicConfig(
@@ -46,12 +90,14 @@ def main() -> int:
     workspace = Path(args.workspace).resolve()
     workspace.mkdir(parents=True, exist_ok=True)
 
-    logger.info(f"Initialising Antigravity Engine | workspace={workspace}")
-
+    emit_status_banner()
+    print("3-tier-multi-agent-architecture Status: ON 🟢")
     print("🌌 Antigravity 3-Tier Multi-Agent Architecture + CrewAI")
     print(f"📁 Workspace : {workspace}")
     print(f"📁 Project   : {PROJECT_ROOT}")
     print(f"🎯 Objective : {args.prompt}\n")
+
+    logger.info(f"Initialising Antigravity Engine | workspace={workspace}")
 
     # Pre-execution: Semantic Auto-Healing — always uses PROJECT_ROOT so the
     # architecture docs and rule templates are reliably available.
@@ -59,7 +105,7 @@ def main() -> int:
     healer = ArchitectureHealer(str(PROJECT_ROOT))
     rules_to_validate = [
         ".agent/rules/l1-orchestration.md",
-        ".agent/rules/l2-implementation.md",
+        ".agent/rules/l2-sub-agent.md",
         ".agent/rules/l3-leaf-worker.md",
         ".agent/rules/system-verification-agent.md",
     ]

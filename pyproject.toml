@@ -4,12 +4,8 @@ version = "2.0.0"
 description = "3-Tier Multi-Agent Architecture with CrewAI Integration"
 requires-python = ">=3.11"
 dependencies = [
-    "crewai[openai]>=0.80.0",
-    "crewai[litellm]>=0.80.0",
+    "crewai[openai,litellm]>=0.80.0",
     "crewai-tools",
-    "langgraph>=0.2.0",
-    "langchain-openai>=0.2.0",
-    "pydantic-ai>=0.0.13",
     "chromadb>=0.5.0",
     "python-dotenv>=1.0.0",
     "ruamel.yaml>=0.17.32",
@@ -26,6 +22,11 @@ dev = [
     "mypy>=1.9.0",
     "ruff>=0.3.0",
     "pre-commit>=3.6.0"
+]
+experimental = [
+    "langgraph>=0.2.0",
+    "langchain-openai>=0.2.0",
+    "pydantic-ai>=0.0.13"
 ]
 
 [dependency-groups]

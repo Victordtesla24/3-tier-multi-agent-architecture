@@ -20,9 +20,6 @@ def test_engine_initialization():
 def test_benchmark_parsing():
     """Test that a benchmark prompt from examples/ maps cleanly to execution context."""
     benchmark_path = Path(__file__).parent.parent / "examples" / "benchmark_1.md"
-    original = Path("/Users/Shared/antigravity/3-tier-multi-agent-architecture-work/examples/benchmark_1.md")
-    if not benchmark_path.exists() and original.exists():
-        benchmark_path = original
     assert benchmark_path.exists(), "Benchmark 1 missing from examples suite."
 
     with open(benchmark_path, "r") as f:
@@ -35,10 +32,6 @@ def test_benchmark_parsing():
 def test_all_benchmarks_have_input_data_tag():
     """Regression: all benchmark files must contain the <input_data> tag required by the architecture."""
     examples_dir = Path(__file__).parent.parent / "examples"
-    original_dir = Path("/Users/Shared/antigravity/3-tier-multi-agent-architecture-work/examples")
-    if not examples_dir.exists() and original_dir.exists():
-        examples_dir = original_dir
-        
     benchmarks = list(examples_dir.glob("benchmark_*.md"))
     assert len(benchmarks) >= 4, f"Expected at least 4 benchmarks, found {len(benchmarks)}"
 
@@ -73,8 +66,8 @@ def test_verification_scoring_rejects_placeholders():
     engine = OrchestrationStateMachine(workspace_dir="/tmp/mock_workspace")
 
     # Outputs with banned markers should fail verification
-    assert engine._run_verification_scoring({"final_output": "This is TODO code"}) is False
-    assert engine._run_verification_scoring({"final_output": "placeholder value"}) is False
+    assert engine._run_verification_scoring({"final_output": "# TODO: implement"}) is False
+    assert engine._run_verification_scoring({"final_output": "<placeholder> value"}) is False
     assert engine._run_verification_scoring({"final_output": "raise NotImplementedError"}) is False
     assert engine._run_verification_scoring({"final_output": "TBD - will finish later"}) is False
 

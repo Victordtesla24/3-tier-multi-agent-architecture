@@ -130,11 +130,11 @@ git clone https://github.com/Victordtesla24/3-tier-multi-agent-architecture.git
 cd 3-tier-multi-agent-architecture
 
 # 2. Install dependencies via uv (Required for CrewAI)
-uv sync --all-extras
+uv sync --all-extras --python 3.12
 
 # 3. Setup API Keys
 cp .env.template .env
-# Edit .env and supply your GOOGLE_API_KEY, OPENAI_API_KEY, MINIMAX_API_KEY, MINIMAX_BASE_URL, DEEPSEEK_BASE_URL, etc.
+# Edit .env and supply your GOOGLE_API_KEY, OPENAI_API_KEY, MINIMAX_API_KEY, DEEPSEEK_API_KEY, MINIMAX_BASE_URL, DEEPSEEK_BASE_URL, etc.
 # Optionally set CREWAI_STORAGE_DIR (defaults to <workspace>/.agent/memory/crewai_storage).
 
 # 4. Make the integration script executable
@@ -272,25 +272,28 @@ The `src/experimental/` directory contains non-canonical orchestrator implementa
 
 ### How to functionally verify the architecture status:
 
-Use the Antigravity Terminal to confirm the environment configurations. It should match the blueprint exactly:
+Use your terminal to confirm the environment is correctly configured:
 
 ```bash
-# 1. Check if the directories exist
+# 1. Check if the core directories exist
 ls -la .agent/rules .agent/workflows .agent/tmp .agent/memory
 
-# 2. Check the Agent Manager
-antigravity status agents
-# Expected Output should include:
-# - system-verification-agent
-# - internet-research-agent
-# - l1-orchestration
-# - l2-sub-agent
-# - l3-leaf-worker
-# - continuous-learning-agent
+# 2. Verify all agent rule files are present
+ls .agent/rules/
+# Expected output:
+# - system-verification-agent.md
+# - internet-research-agent.md
+# - l1-orchestration.md
+# - l2-sub-agent.md
+# - l3-leaf-worker.md
+# - continuous-learning-agent.md
 
-# 3. Verify the main Workflow
-antigravity workflow list
-# Should display '3-tier-orchestration.md'
+# 3. Verify the main workflow
+cat .agent/workflows/3-tier-orchestration.md
+# Should display the 3-tier orchestration workflow steps
+
+# 4. Run the test suite to confirm the architecture is functional
+make test-pytest
 ```
 
 ---
@@ -308,10 +311,10 @@ graph TD
     classDef warning fill:#e9ecef,stroke:#ced4da,stroke-width:2px,color:#333333;
 
     Q1{"CrewAI Initialization Errors?"}:::query
-    Q1 -- YES --> A1["Run './scripts/integrate_crewai.sh' & 'uv sync --all-extras'"]:::action
+    Q1 -- YES --> A1["Run './scripts/integrate_crewai.sh' & 'uv sync --all-extras --python 3.12'"]:::action
     Q1 -- NO --> Q2{"Are API Keys missing?"}:::query
 
-    Q2 -- YES --> A2["Check '.env' file against '.env.template'.<br/>Gemini and OpenAI keys are mandatory."]:::action
+    Q2 -- YES --> A2["Check '.env' file against '.env.template'.<br/>GOOGLE_API_KEY, OPENAI_API_KEY, MINIMAX_API_KEY, DEEPSEEK_API_KEY, MINIMAX_BASE_URL, and DEEPSEEK_BASE_URL are mandatory."]:::action
     Q2 -- NO --> Q3{"Are agents failing AST Verification?"}:::query
 
     Q3 -- YES --> A3["Ensure L3 agents are not outputting 'pass' or 'TODO'.<br/>The orchestrator rejects placeholder logic."]:::warning
@@ -323,7 +326,7 @@ graph TD
 
 ### Common Faults & Remediations
 - **Issue**: Missing CrewAI dependencies or version conflicts.
-  - **Remediation**: Run `uv sync --all-extras`. We recommend a Python 3.12+ virtual environment to guarantee compatible pre-built wheels for underlying Rust extensions (`pydantic-core`, `tokenizers`, `tiktoken`).
+  - **Remediation**: Run `uv sync --all-extras --python 3.12`. This enforces a compatible interpreter for pre-built wheels used by Rust-backed dependencies (`pydantic-core`, `tokenizers`, `tiktoken`).
 - **Issue**: AST Verification Error `Verification failed: detected banned lexical marker 'TODO'` or `AST detected empty implementation (pass)`.
   - **Remediation**: Re-run the objective with stricter constraints against boilerplate code. The system pipeline fundamentally rejects simulated logic prior to completion.
 - **Issue**: FallbackLLM exhaustion.

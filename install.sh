@@ -90,7 +90,7 @@ command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh
 export PATH="$HOME/.cargo/bin:$PATH"
 export UV_PROJECT_ENVIRONMENT=/tmp/.venv-antigravity
 export UV_CACHE_DIR=/tmp/uv-cache
-uv sync --all-extras -q || echo -e "${RED}⚠️ Uv sync failure detected. Continuing with caution.${NC}"
+uv sync --all-extras --python 3.12 -q || echo -e "${RED}⚠️ Uv sync failure detected. Continuing with caution.${NC}"
 
 python3 src/engine/config_manager.py "$GEMINI_CONF"
 
@@ -105,6 +105,6 @@ echo -e "To confirm continuous monitoring and execution status:"
 echo -e "1. Open the Antigravity IDE App."
 echo -e "2. Start a New Chat or Conversation."
 echo -e "3. You MUST see the following status message securely printed at the top:"
-echo -e "\n   ${BLUE}# 3-tier multi-agent-architecture: ON${NC}\n"
+echo -e "\n   ${BLUE}3-tier-multi-agent-architecture Status: ON 🟢${NC}\n"
 echo -e "The architecture will now autonomously execute exactly as intended."
 echo -e "======================================================================"

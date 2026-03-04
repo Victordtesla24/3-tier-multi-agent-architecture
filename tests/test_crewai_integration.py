@@ -7,7 +7,7 @@ live API keys or network access.
 import pytest
 import sys
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from dataclasses import fields
 
 sys.path.append(str(Path(__file__).parent.parent / "src"))
@@ -38,7 +38,7 @@ class TestModuleImports:
 
     def test_import_llm_config(self):
         from engine.llm_config import (
-            Effort, ModelSpec, EnvConfigError, FallbackLLM,
+            Effort, ModelSpec, ModelTier, EnvConfigError,
             ModelMatrix, build_model_matrix, build_llm,
             load_workspace_env, require_env, normalise_base_url,
         )
@@ -46,6 +46,7 @@ class TestModuleImports:
         assert Effort.MEDIUM.value == "medium"
         assert Effort.HIGH.value == "high"
         assert Effort.XHIGH.value == "xhigh"
+        assert ModelTier is not None
 
     def test_import_crew_orchestrator(self):
         from engine.crew_orchestrator import CrewAIThreeTierOrchestrator
@@ -110,6 +111,11 @@ class TestModelConfig:
         assert "level1" in field_names
         assert "level2" in field_names
 
+    def test_model_tier_fields(self):
+        from engine.llm_config import ModelTier
+        field_names = [f.name for f in fields(ModelTier)]
+        assert field_names == ["primary", "fallback"]
+
     def test_hardcoded_model_specs(self):
         from engine.llm_config import (
             ORCHESTRATION_PRIMARY, ORCHESTRATION_FALLBACK,
@@ -161,85 +167,21 @@ class TestUtilities:
         # Should not raise even if .env doesn't exist
         load_workspace_env("/tmp/nonexistent_workspace_dir_12345")
 
+    def test_load_workspace_env_precedence(self, tmp_path):
+        from engine.llm_config import load_workspace_env
 
-# ---------------------------------------------------------------------------
-# FallbackLLM routing logic
-# ---------------------------------------------------------------------------
+        project_root = tmp_path / "project"
+        workspace = tmp_path / "workspace"
+        project_root.mkdir()
+        workspace.mkdir()
 
-class TestFallbackLLM:
-    """Verify FallbackLLM primary→fallback routing."""
+        (project_root / ".env").write_text("ANTIGRAVITY_TEST_ENV=project\n", encoding="utf-8")
+        (workspace / ".env").write_text("ANTIGRAVITY_TEST_ENV=workspace\n", encoding="utf-8")
 
-    def test_primary_success(self):
-        from engine.llm_config import FallbackLLM
-
-        primary = MagicMock()
-        primary.call.return_value = "primary result"
-        primary.temperature = 0.5
-        fallback = MagicMock()
-
-        flm = FallbackLLM(name="test-tier", primary=primary, fallback=fallback)
-        result = flm.call(messages=[{"role": "user", "content": "test"}])
-
-        assert result == "primary result"
-        primary.call.assert_called_once()
-        fallback.call.assert_not_called()
-
-    def test_fallback_on_primary_failure(self):
-        from engine.llm_config import FallbackLLM
-
-        primary = MagicMock()
-        primary.call.side_effect = RuntimeError("API down")
-        primary.temperature = 0.5
-        fallback = MagicMock()
-        fallback.call.return_value = "fallback result"
-
-        flm = FallbackLLM(name="test-tier", primary=primary, fallback=fallback)
-        result = flm.call(messages=[{"role": "user", "content": "test"}])
-
-        assert result == "fallback result"
-        primary.call.assert_called_once()
-        fallback.call.assert_called_once()
-
-    def test_both_fail_raises(self):
-        from engine.llm_config import FallbackLLM
-
-        primary = MagicMock()
-        primary.call.side_effect = RuntimeError("Primary fail")
-        primary.temperature = 0.5
-        fallback = MagicMock()
-        fallback.call.side_effect = RuntimeError("Fallback fail")
-
-        flm = FallbackLLM(name="test-tier", primary=primary, fallback=fallback)
-        with pytest.raises(RuntimeError, match="LLM fallback exhausted"):
-            flm.call(messages=[{"role": "user", "content": "test"}])
-
-    def test_soft_failure_triggers_fallback(self):
-        from engine.llm_config import FallbackLLM
-
-        primary = MagicMock()
-        primary.call.return_value = ""
-        primary.temperature = 0.5
-        fallback = MagicMock()
-        fallback.call.return_value = "fallback recovered"
-
-        flm = FallbackLLM(name="test-tier", primary=primary, fallback=fallback)
-        result = flm.call(messages=[{"role": "user", "content": "test"}])
-
-        assert result == "fallback recovered"
-
-    def test_structural_refusal_triggers_fallback(self):
-        from engine.llm_config import FallbackLLM
-
-        primary = MagicMock()
-        primary.call.return_value = "I cannot fulfill this request because..."
-        primary.temperature = 0.5
-        fallback = MagicMock()
-        fallback.call.return_value = "proper response"
-
-        flm = FallbackLLM(name="test-tier", primary=primary, fallback=fallback)
-        result = flm.call(messages=[{"role": "user", "content": "test"}])
-
-        assert result == "proper response"
+        with patch.dict("os.environ", {}, clear=True):
+            load_workspace_env(workspace, project_root=project_root)
+            import os
+            assert os.environ.get("ANTIGRAVITY_TEST_ENV") == "workspace"
 
 
 # ---------------------------------------------------------------------------
