@@ -2,7 +2,7 @@
 
 install:
 	@command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh
-	export UV_PROJECT_ENVIRONMENT=/tmp/.venv-antigravity && export UV_CACHE_DIR=/tmp/uv-cache && uv sync --all-extras --python 3.12
+	env -u VIRTUAL_ENV UV_PROJECT_ENVIRONMENT=/tmp/.venv-antigravity UV_CACHE_DIR=/tmp/uv-cache uv sync --all-extras --python 3.12
 
 integrate-crewai:
 	chmod +x scripts/integrate_crewai.sh
@@ -40,7 +40,8 @@ build:
 
 run-cli:
 	PYTHONPATH=src /tmp/.venv-antigravity/bin/python src/orchestrator/antigravity-cli.py \
-		--prompt "test" --workspace /tmp/antigravity_workspace
+		--prompt "test" --workspace /tmp/antigravity_workspace \
+		--strict-provider-validation --max-provider-4xx 50
 
 benchmark:
 	@echo "Running execution benchmark harness..."

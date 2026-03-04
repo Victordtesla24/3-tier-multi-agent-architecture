@@ -5,7 +5,7 @@ description = "3-Tier Multi-Agent Architecture with CrewAI Integration"
 requires-python = ">=3.11"
 dependencies = [
     "crewai[openai,litellm]>=0.80.0",
-    "crewai-tools",
+    "crewai-tools>=0.75.0,<0.76.0",
     "chromadb>=0.5.0",
     "python-dotenv>=1.0.0",
     "ruamel.yaml>=0.17.32",

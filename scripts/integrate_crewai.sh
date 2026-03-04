@@ -1,7 +1,7 @@
 #!/bin/bash
 # CrewAI Integration Script for 3-Tier Architecture
 
-set -e
+set -euo pipefail
 
 echo "🌌 Antigravity 3-Tier Architecture - CrewAI Integration"
 echo "======================================================="
@@ -10,7 +10,7 @@ echo "======================================================="
 echo "📦 Installing dependencies..."
 export UV_PROJECT_ENVIRONMENT=${UV_PROJECT_ENVIRONMENT:-/tmp/.venv-antigravity}
 export UV_CACHE_DIR=${UV_CACHE_DIR:-/tmp/uv-cache}
-uv sync --all-extras --python 3.12
+env -u VIRTUAL_ENV uv sync --all-extras --python 3.12
 
 # Step 2: Verify API keys in .env
 echo "🔑 Verifying API keys..."
@@ -31,6 +31,19 @@ for key in "${required_keys[@]}"; do
     fi
 done
 
+echo "🧪 Validating toolchain compatibility..."
+if ! "${UV_PROJECT_ENVIRONMENT}/bin/python" - <<'PY'
+try:
+    from crewai_tools import FileReadTool, FileWriterTool  # noqa: F401
+    print("crewai_tools import check passed")
+except Exception as exc:
+    print(f"crewai_tools import check failed: {type(exc).__name__}: {exc}")
+    raise SystemExit(1)
+PY
+then
+    echo "⚠️  WARNING: crewai_tools import failed. Local workspace tool fallback will be used at runtime."
+fi
+
 # Step 3: Verify directory structure
 echo "📁 Verifying integration directories..."
 mkdir -p src/engine
@@ -47,9 +60,9 @@ echo ""
 echo "✅ CrewAI integration complete!"
 echo ""
 echo "Next steps:"
-echo "1. Review src/engine/llm_providers.py for LLM configuration"
-echo "2. Review src/engine/crew_agents.py for agent definitions"
-echo "3. Review src/engine/crew_orchestrator.py for orchestrator logic"
+echo "1. Review src/engine/llm_config.py for provider policy + validation"
+echo "2. Review src/engine/crew_orchestrator.py for telemetry and tool fallback logic"
+echo "3. Review src/engine/state_machine.py for retry and reliability gates"
 echo "4. Test with: make run-cli"
 echo ""
 echo "🚀 System ready for execution!"

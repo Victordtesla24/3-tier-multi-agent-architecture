@@ -58,6 +58,8 @@ import logging
 # Ensure src/ is on the module path regardless of invocation CWD
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from engine.llm_config import EnvConfigError, load_workspace_env, validate_provider_runtime_env
+from engine.logging_utils import install_log_redaction
 from engine.semantic_healer import ArchitectureHealer
 from engine.status_banner import emit_status_banner
 from engine.state_machine import OrchestrationStateMachine
@@ -66,6 +68,9 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
+install_log_redaction()
+# Prevent noisy duplicate tracer-provider warnings from third-party libs.
+logging.getLogger("opentelemetry.trace").setLevel(logging.ERROR)
 logger = logging.getLogger("AntigravityCLI")
 
 # Project root is always two levels up from this file (src/orchestrator/ → project root)
@@ -83,6 +88,24 @@ def main() -> int:
         default="/tmp/antigravity_workspace",
         help="Working directory for pipeline artefacts (default: /tmp/antigravity_workspace)",
     )
+    parser.add_argument(
+        "--strict-provider-validation",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Fail fast if provider credentials/base URLs are missing or placeholder values.",
+    )
+    parser.add_argument(
+        "--max-provider-4xx",
+        type=int,
+        default=50,
+        help="Maximum tolerated provider HTTP 4xx events before pipeline abort.",
+    )
+    parser.add_argument(
+        "--fail-on-research-empty",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Fail pipeline if research stage returns fewer than two citations for non-trivial prompts.",
+    )
     parser.add_argument("--verbose", action="store_true", help="Enable verbose CrewAI output")
 
     args = parser.parse_args()
@@ -99,6 +122,15 @@ def main() -> int:
 
     logger.info(f"Initialising Antigravity Engine | workspace={workspace}")
 
+    if args.strict_provider_validation:
+        try:
+            load_workspace_env(workspace, project_root=PROJECT_ROOT)
+            validate_provider_runtime_env(strict=True)
+        except EnvConfigError as exc:
+            logger.error(f"Provider preflight failed: {exc}")
+            print(f"\n❌ Execution failed: {exc}")
+            return 1
+
     # Pre-execution: Semantic Auto-Healing — always uses PROJECT_ROOT so the
     # architecture docs and rule templates are reliably available.
     logger.info("Engaging Semantic Healer pre-flight checks…")
@@ -113,7 +145,12 @@ def main() -> int:
         healer.validate_and_heal(rule)
 
     # Initialise the programmatic state machine back-end
-    engine = OrchestrationStateMachine(workspace_dir=str(workspace))
+    engine = OrchestrationStateMachine(
+        workspace_dir=str(workspace),
+        strict_provider_validation=args.strict_provider_validation,
+        max_provider_4xx=args.max_provider_4xx,
+        fail_on_research_empty=args.fail_on_research_empty,
+    )
 
     logger.info("Starting execution pipeline…")
     try:
@@ -126,6 +163,9 @@ def main() -> int:
                     "success": success,
                     "workspace": str(workspace),
                     "prompt": args.prompt,
+                    "strict_provider_validation": args.strict_provider_validation,
+                    "max_provider_4xx": args.max_provider_4xx,
+                    "fail_on_research_empty": args.fail_on_research_empty,
                 },
                 indent=2,
             ),

@@ -138,6 +138,47 @@ def test_stage_fallback_emits_telemetry(mock_workspace):
     )
 
     assert result == "fallback success"
-    assert events[0][0] == "FALLBACK_ATTEMPT"
-    assert events[1][0] == "FALLBACK_RESULT"
-    assert events[1][1]["status"] == "success"
+    event_types = [event for event, _ in events]
+    assert "FALLBACK_ATTEMPT" in event_types
+    assert "FALLBACK_RESULT" in event_types
+    provider_events = [details for event, details in events if event == "PROVIDER_ATTEMPT"]
+    assert len(provider_events) >= 3
+    assert {"run_id", "stage", "model", "provider", "attempt", "http_status", "retriable", "fallback_used", "status"} <= set(provider_events[0].keys())
+
+
+def test_non_retriable_error_does_not_backoff(mock_workspace):
+    from engine.state_machine import OrchestrationStateMachine
+
+    machine = OrchestrationStateMachine(workspace_dir=mock_workspace)
+    call_count = {"count": 0}
+
+    def fail_non_retriable(*_args):
+        call_count["count"] += 1
+        raise RuntimeError('HTTP/1.1 400 Bad Request {"code":"invalid_request_error"}')
+
+    with pytest.raises(RuntimeError):
+        machine._execute_with_backoff(fail_non_retriable, stage_name="unit_test_non_retriable")
+
+    assert call_count["count"] == 1
+
+
+def test_research_context_is_normalised_to_schema(mock_workspace):
+    orchestrator = CrewAIThreeTierOrchestrator(workspace_dir=mock_workspace, verbose=False)
+    raw = "No official sources were found for this run."
+    normalised = orchestrator._normalise_research_context(raw)
+
+    assert "## Summary" in normalised
+    assert "## Citations[]" in normalised
+    assert "## MissingConfig[]" in normalised
+    assert "## RiskNotes[]" in normalised
+
+
+def test_provider_4xx_budget_enforced(mock_workspace):
+    from engine.state_machine import OrchestrationStateMachine
+
+    machine = OrchestrationStateMachine(workspace_dir=mock_workspace, max_provider_4xx=1)
+    machine._record_httpx_status(400, 'HTTP Request: "HTTP/1.1 400 Bad Request"')
+    machine._record_httpx_status(401, 'HTTP Request: "HTTP/1.1 401 Unauthorized"')
+
+    with pytest.raises(RuntimeError):
+        machine._enforce_provider_error_budget("unit_test_budget")

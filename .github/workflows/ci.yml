@@ -23,6 +23,37 @@ jobs:
           pip install uv
           uv sync --all-extras
 
+      - name: Secret redaction gate (tracked files)
+        run: |
+          python - <<'PY'
+          import re
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          tracked = subprocess.check_output(["git", "ls-files"], text=True).splitlines()
+          pattern = re.compile(r"(AIza[0-9A-Za-z_-]{20,}|sk-[A-Za-z0-9_-]{16,})")
+          allow_files = {".env.template"}
+          violations = []
+
+          for rel in tracked:
+              if rel in allow_files:
+                  continue
+              p = Path(rel)
+              if not p.exists() or p.is_dir():
+                  continue
+              text = p.read_text(encoding="utf-8", errors="ignore")
+              if pattern.search(text):
+                  violations.append(rel)
+
+          if violations:
+              print("Secret pattern violations detected:")
+              for item in violations:
+                  print(f" - {item}")
+              sys.exit(1)
+          print("Secret redaction gate passed.")
+          PY
+
       - name: Validate Configuration Merger Atomic Safety
         run: |
           PYTHONPATH=src python src/engine/config_manager.py .agent/tmp/mock_gemini.md
@@ -38,7 +69,7 @@ jobs:
         run: |
           cd tests
           PYTHONPATH=$GITHUB_WORKSPACE/src python -m pytest \
-            test_architecture.py test_crewai_integration.py test_contracts.py \
+            test_architecture.py test_crewai_integration.py test_contracts.py test_cli_runtime.py test_e2e.py \
             --collect-only -q -p no:cacheprovider > /tmp/collect.txt || true
           COUNT=$(grep -c "::" /tmp/collect.txt || true)
           if [ "$COUNT" -lt 10 ]; then
@@ -59,7 +90,7 @@ jobs:
         run: |
           cd tests
           PYTHONPATH=$GITHUB_WORKSPACE/src python -m pytest \
-            test_architecture.py test_crewai_integration.py test_contracts.py \
+            test_architecture.py test_crewai_integration.py test_contracts.py test_cli_runtime.py test_e2e.py \
             -v -p no:cacheprovider
 
       - name: Build Docker Image

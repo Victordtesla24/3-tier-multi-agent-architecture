@@ -40,13 +40,18 @@ class TestModuleImports:
         from engine.llm_config import (
             Effort, ModelSpec, ModelTier, EnvConfigError,
             ModelMatrix, build_model_matrix, build_llm,
+            ProviderPolicy, classify_provider_error,
             load_workspace_env, require_env, normalise_base_url,
+            validate_provider_runtime_env,
         )
         assert Effort.LOW.value == "low"
         assert Effort.MEDIUM.value == "medium"
         assert Effort.HIGH.value == "high"
         assert Effort.XHIGH.value == "xhigh"
         assert ModelTier is not None
+        assert ProviderPolicy is not None
+        assert callable(classify_provider_error)
+        assert callable(validate_provider_runtime_env)
 
     def test_import_crew_orchestrator(self):
         from engine.crew_orchestrator import CrewAIThreeTierOrchestrator
@@ -182,6 +187,31 @@ class TestUtilities:
             load_workspace_env(workspace, project_root=project_root)
             import os
             assert os.environ.get("ANTIGRAVITY_TEST_ENV") == "workspace"
+
+    def test_validate_provider_runtime_env_rejects_placeholder(self):
+        from engine.llm_config import validate_provider_runtime_env, EnvConfigError
+        with patch.dict(
+            "os.environ",
+            {
+                "OPENAI_API_KEY": "your_openai_api_key_here",
+                "GOOGLE_API_KEY": "real_google",
+                "MINIMAX_API_KEY": "real_minimax",
+                "DEEPSEEK_API_KEY": "real_deepseek",
+                "MINIMAX_BASE_URL": "https://api.minimax.chat/v1",
+                "DEEPSEEK_BASE_URL": "https://api.deepseek.com/v1",
+            },
+            clear=True,
+        ):
+            with pytest.raises(EnvConfigError):
+                validate_provider_runtime_env(strict=True)
+
+    def test_classify_provider_error_marks_non_retriable_4xx(self):
+        from engine.llm_config import classify_provider_error
+
+        error = RuntimeError('HTTP/1.1 400 Bad Request {"code":"invalid_request_error"}')
+        classified = classify_provider_error(error, model="openai/gpt-5.2-codex")
+        assert classified["http_status"] == 400
+        assert classified["retriable"] is False
 
 
 # ---------------------------------------------------------------------------
