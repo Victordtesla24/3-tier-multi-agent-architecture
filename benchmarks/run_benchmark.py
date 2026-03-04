@@ -12,37 +12,17 @@ Usage:
 import os
 import sys
 
-# ---------------------------------------------------------------------------
-# CrewAI storage redirect — MUST execute before any crewai import.
-# Mirrors the same pattern used in conftest.py and antigravity-cli.py.
-# ---------------------------------------------------------------------------
-_CREWAI_STORAGE = os.environ.get(
-    "CREWAI_STORAGE_DIR", "/tmp/crewai_benchmark_storage"
-)
-os.makedirs(_CREWAI_STORAGE, exist_ok=True)
-os.environ.setdefault("CREWAI_STORAGE_DIR", _CREWAI_STORAGE)
-os.environ.setdefault("CREWAI_HOME", _CREWAI_STORAGE)
-
-try:
-    import appdirs as _appdirs
-
-    def _patched_user_data_dir(appname=None, appauthor=None, version=None, roaming=False):
-        base = os.path.join(_CREWAI_STORAGE, "appdirs_data")
-        if appname:
-            base = os.path.join(base, appname)
-        os.makedirs(base, exist_ok=True)
-        return base
-
-    _appdirs.user_data_dir = _patched_user_data_dir
-except ImportError:
-    pass
-# ---------------------------------------------------------------------------
-
 import time
 import json
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch, MagicMock
+
+# Ensure src/ is on the module path regardless of invocation CWD
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from engine.crewai_storage import bootstrap_crewai_storage
+from engine.workflow_primitives import sanitize_user_input
 
 
 BENCHMARK_FIXTURES = [
@@ -79,11 +59,14 @@ def run_single_benchmark(fixture: dict, workspace: Path) -> dict:
 
     start = time.time()
     try:
-        orchestrator = CrewAIThreeTierOrchestrator(str(workspace), verbose=False)
+        # Instantiate orchestrator to exercise initialisation paths without
+        # requiring live provider access in mocked environments.
+        _orchestrator = CrewAIThreeTierOrchestrator(str(workspace), verbose=False)
 
-        # Run prompt reconstruction only (does not require live API in mocked mode)
-        reconstructed = orchestrator._extract_input_data(fixture["prompt"])
-        result["extracted_prompt_length"] = len(reconstructed)
+        # Use the shared workflow primitive for input handling so benchmarks
+        # stay aligned with the orchestration pipeline behaviour.
+        extracted = sanitize_user_input(fixture["prompt"])
+        result["extracted_prompt_length"] = len(extracted)
         result["success"] = True
     except Exception as e:
         result["error"] = f"{type(e).__name__}: {e}"
@@ -97,8 +80,22 @@ def main():
     print("  Antigravity Execution Benchmark Harness")
     print("=" * 60)
 
-    workspace = Path("/tmp/antigravity_benchmark_workspace")
+    project_root = Path(__file__).parent.parent.resolve()
+
+    # Resolve benchmark workspace using the same pattern as the CLI.
+    env_workspace = os.environ.get("ANTIGRAVITY_WORKSPACE_DIR")
+    if env_workspace:
+        workspace = Path(env_workspace).resolve()
+    else:
+        root = Path(os.environ.get("ANTIGRAVITY_WORKSPACE_ROOT", project_root / "workspaces"))
+        workspace = (root / "benchmarks").resolve()
+
     workspace.mkdir(parents=True, exist_ok=True)
+
+    # Bind CrewAI storage into the benchmark workspace namespace.
+    storage_dir = bootstrap_crewai_storage(workspace)
+    print(f"📁 Benchmark workspace : {workspace}")
+    print(f"🧠 CrewAI storage      : {storage_dir}")
 
     # Provide dummy env vars so the orchestrator can instantiate without real keys
     env_overrides = {
@@ -140,7 +137,6 @@ def main():
     }
 
     # Persist results — resolve output dir from script location (project root)
-    project_root = Path(__file__).parent.parent.resolve()
     out_dir = project_root / "docs" / "benchmarks"
     try:
         out_dir.mkdir(parents=True, exist_ok=True)
