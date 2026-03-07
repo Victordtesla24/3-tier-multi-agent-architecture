@@ -60,3 +60,6 @@ Icon
 
 # Generated benchmark output
 docs/benchmarks/latest_results.json
+
+# Git worktrees — never track embedded repos as submodules
+.worktrees/

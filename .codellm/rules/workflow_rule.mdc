@@ -1,0 +1,21 @@
+---
+description: Maximum execution accuracy workflow orchestration
+globs: *.py", "*.js", "*.ts", "*.tsx", "*.jsx", "*.sh", "*.json", "code_editors/*", "editors/*", "browsers/*
+alwaysApply: true
+---
+
+# Workflow Execution Rule
+
+- Treat every user prompt as a structured execution request requiring full requirement extraction, success-criteria extraction, and constraint extraction before action.
+- Select the single best industry-standard tool, method, command, application, or implementation path from context; never output open-ended options unless a blocking ambiguity forces clarification.
+- Halt only when a missing requirement blocks execution of the main success criteria; never ask trivial questions about minor details, edge cases outside immediate scope, or standard implementation specifics.
+- If files or links are provided, inspect every file or linked source available to the task, synthesize their contents with the user input, and use that synthesized context as persistent working context for the current execution.
+- Preserve nested logic exactly as provided; never flatten, compress, truncate, or oversimplify layered requirements, dependencies, workflows, code structures, or output specifications.
+- Reorganize complex input into a strict executable sequence: Raw Input -> Context Synthesis -> Plan -> Execute -> Validate -> Final Output.
+- Before producing the final answer, verify that every distinct requirement, success criterion, constraint, logic dependency, and requested output format has been mapped to an executable action and reflected in the final output.
+- Do not treat coherence as completion; completion is allowed only when requirement-to-instruction-to-output coverage is exactly 100%.
+- Eliminate conversational filler, but preserve full functional density; never confuse efficiency with summarization.
+- If the task involves code, scripting, debugging, automation, configuration, or error resolution, produce only production-grade, publication-ready output with no placeholders, dummy calls, fake logic, simulated execution, masked errors, suppressed warnings, or unfinished TODO sections.
+- If the same error persists beyond two failed resolution attempts, research the most suitable solution from authentic, reliable, highly rated technical sources, libraries, or repositories before continuing.
+- For every automation sequence, prefer reliable execution patterns: verify prerequisites, execute deterministically, confirm success after each major step, and stop on blocking failure rather than pretending success.
+- Final response must contain only the requested deliverable, or only blocking clarifying questions if the input is insufficient for correct execution.

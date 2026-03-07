@@ -144,39 +144,50 @@ def extract_json_payload(raw: str) -> str:
 class SemanticTaskPlanner:
     """Construct dependency-validated task graphs from prompt and research context."""
 
-    _WEATHER_PATTERN = re.compile(
-        r"^fetch weather for (?P<city>[a-zA-Z\s]+) and save to (?P<file>[\w.\-/]+)$",
-        flags=re.IGNORECASE,
-    )
-
     def __init__(self, llm_planner: Callable[[str], str]):
         self._llm_planner = llm_planner
 
     def _apply_fast_path(self, source_prompt: str) -> OrchestrationPlan | None:
+        """
+        Dynamically route recognized prompt patterns to pre-compiled plans bypassing LLM reasoning overhead.
+        Extensible registry iterates over strict corporate intents to yield deterministically bounded task graphs.
+        """
         prompt = " ".join(source_prompt.split()).strip()
-        match = self._WEATHER_PATTERN.match(prompt)
-        if match is None:
-            return None
 
-        city = match.group("city").strip()
-        output_file = match.group("file").strip()
+        # Extensible intent registry mapping optimized regex payload to completely compiled Task Graphs
+        intent_registry = [
+            {
+                "pattern": re.compile(r"^fetch weather for (?P<city>[a-zA-Z\s]+) and save to (?P<file>[\w.\-/]+)$", flags=re.IGNORECASE),
+                "plan_builder": lambda match: OrchestrationPlan(
+                    original_query=prompt,
+                    tasks=[
+                        WorkerTask(
+                            task_id="fetch_weather",
+                            description=f"Fetch the latest weather for {match.group('city').strip()}.",
+                            required_tools=["weather_api"],
+                        ),
+                        WorkerTask(
+                            task_id="save_weather",
+                            description=f"Save the weather report to {match.group('file').strip()}.",
+                            dependencies=["fetch_weather"],
+                            required_tools=["workspace_file_write"],
+                        ),
+                    ],
+                )
+            }
+            # System developers may seamlessly append deployment, build, and CI hooks directly into the array here
+        ]
 
-        return OrchestrationPlan(
-            original_query=prompt,
-            tasks=[
-                WorkerTask(
-                    task_id="fetch_weather",
-                    description=f"Fetch the latest weather for {city}.",
-                    required_tools=["weather_api"],
-                ),
-                WorkerTask(
-                    task_id="save_weather",
-                    description=f"Save the weather report to {output_file}.",
-                    dependencies=["fetch_weather"],
-                    required_tools=["workspace_file_write"],
-                ),
-            ],
-        )
+        for intent in intent_registry:
+            match = intent["pattern"].match(prompt)
+            if match is not None:
+                try:
+                    return intent["plan_builder"](match)
+                except Exception:
+                    # In extreme failure modes, gracefully degrade back to the core LLM execution planner
+                    return None
+
+        return None
 
     def create_plan(
         self,
@@ -261,8 +272,11 @@ class ReflexiveTaskWorker:
         task: WorkerTask,
         context: dict[str, Any],
     ) -> WorkerTask:
+        import random
+
         current_result = ""
         qa_feedback = ""
+        base_backoff_seconds = 2.0
 
         while task.attempt_count < self.max_retries:
             task.attempt_count += 1
@@ -277,6 +291,7 @@ class ReflexiveTaskWorker:
                         self.evaluation_runner(task, current_result, attempt_context)
                     )
                 ).strip()
+
                 if evaluation.upper().startswith("PASS"):
                     task.result = current_result
                     task.status = TaskStatus.COMPLETED
@@ -294,6 +309,13 @@ class ReflexiveTaskWorker:
                 )
                 qa_feedback = task.error_log
 
+            # Apply decoupled asynchronous exponential backoff + jitter prior to engaging internal retry
+            if task.attempt_count < self.max_retries:
+                # Add fractional randomized jitter between 0.1 to 1.5 seconds to strictly offset rate synchronization
+                jitter = random.uniform(0.1, 1.5)
+                backoff_time = (base_backoff_seconds ** task.attempt_count) + jitter
+                await asyncio.sleep(backoff_time)
+
         task.status = TaskStatus.FAILED
         return task
 
@@ -306,9 +328,11 @@ class DAGTaskExecutor:
         *,
         worker_dispatcher: Callable[[WorkerTask, dict[str, Any]], Awaitable[WorkerTask]],
         event_sink: TaskEventSink | None = None,
+        task_timeout_seconds: float = 300.0,
     ):
         self.worker_dispatcher = worker_dispatcher
         self.event_sink = event_sink
+        self.task_timeout_seconds = task_timeout_seconds
 
     def _emit(self, event_type: str, details: dict[str, Any]) -> None:
         if self.event_sink is None:
@@ -370,9 +394,23 @@ class DAGTaskExecutor:
                 },
             )
 
+            async def _run_with_timeout(ds_task: WorkerTask, ds_context: dict[str, Any]) -> WorkerTask:
+                try:
+                    return await asyncio.wait_for(
+                        self.worker_dispatcher(ds_task, ds_context),
+                        timeout=self.task_timeout_seconds,
+                    )
+                except asyncio.TimeoutError:
+                    ds_task.status = TaskStatus.FAILED
+                    ds_task.error_log = (
+                        f"Task exceeded {self.task_timeout_seconds}s timeout boundary."
+                    )
+                    ds_task.attempt_count += 1
+                    return ds_task
+
             results = await asyncio.gather(
                 *[
-                    self.worker_dispatcher(
+                    _run_with_timeout(
                         task,
                         {
                             "global": dict(global_context),

@@ -147,6 +147,31 @@ def test_dag_executor_runs_parallel_batches():
     assert batch_events[1]["task_ids"] == ["task_c"]
 
 
+def test_dag_executor_enforces_timeout():
+    """Verify that a hanging worker task is bounded by task_timeout_seconds and yields TaskStatus.FAILED."""
+    plan = OrchestrationPlan(
+        original_query="timeout test",
+        tasks=[
+            WorkerTask(task_id="slow_task", description="Simulated infinite hang"),
+        ],
+    )
+
+    async def hanging_dispatcher(task: WorkerTask, _context: dict[str, object]) -> WorkerTask:
+        await asyncio.sleep(9999)
+        task.status = TaskStatus.COMPLETED
+        task.result = "should never reach"
+        return task
+
+    with pytest.raises(TaskGraphExecutionError) as exc_info:
+        DAGTaskExecutor(
+            worker_dispatcher=hanging_dispatcher,
+            task_timeout_seconds=0.05,
+        ).execute_plan_sync(plan)
+
+    assert exc_info.value.started_execution is True
+    assert "failed after" in str(exc_info.value)
+
+
 def test_dag_executor_rejects_deadlock_before_work_starts():
     invalid_plan = OrchestrationPlan.model_construct(
         plan_id="deadlock-plan",

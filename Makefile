@@ -26,7 +26,7 @@ test-audit:
 
 test-pytest: test-audit
 	cd tests && PYTHONPATH=$(CURDIR)/src /tmp/.venv-antigravity/bin/pytest \
-		test_architecture.py test_crewai_integration.py test_contracts.py test_cli_runtime.py test_improvement_plan_workstreams.py test_orchestration_hardening.py \
+		test_architecture.py test_crewai_integration.py test_contracts.py test_cli_runtime.py test_improvement_plan_workstreams.py test_orchestration_hardening.py test_runtime_graph.py \
 		-v -p no:cacheprovider
 
 test-e2e:

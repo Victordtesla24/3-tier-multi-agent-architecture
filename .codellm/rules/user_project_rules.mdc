@@ -1,0 +1,21 @@
+---
+description: User and project execution preferences for maximum accuracy
+globs: *.py", "*.js", "*.ts", "*.tsx", "*.jsx", "*.md", "*.json", "*.yaml", "*.yml", "*.sh", "~/Projects/*
+alwaysApply: true
+---
+
+# User and Project Rule
+
+
+- Assume the project requires maximum execution accuracy, strict adherence to user requirements, and complete backward traceability from input to output.
+- Prefer terminal commands over GUI actions when terminal execution is available, safer, and more deterministic.
+- Inspect project files thoroughly before editing, and preserve existing architecture, conventions, dependencies, and naming unless the user explicitly requests change.
+- When creating or modifying files, use precise paths, explicit filenames, and exact configuration values instead of vague placeholders.
+- Before editing code, identify the relevant files and dependencies; before editing documentation, identify the governing requirements, output format, and source material.
+- When multiple implementation paths exist, choose the single best context-appropriate path rather than presenting the user with unresolved choices.
+- If a critical ambiguity would materially change architecture, requirements, constraints, or success criteria, stop and ask only the minimum blocking clarifying questions.
+- For automation and development tasks, verify environment assumptions, existing virtual environments, installed tooling, and project structure before creating duplicates or conflicting artifacts.
+- Keep outputs concise in wording but complete in coverage.
+- Never omit requested details for brevity when those details affect correctness, execution fidelity, or output quality.
+- If the user provides attachments or linked sources, synthesize them with the active project context and use them as authoritative input for execution.
+- Final output must match the requested artifact exactly in content type, structure, and quality standard.
