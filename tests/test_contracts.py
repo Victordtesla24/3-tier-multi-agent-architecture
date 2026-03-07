@@ -168,6 +168,7 @@ def test_execution_loop_metadata_reports_partial_on_verification_failure(tmp_pat
 def test_execution_loop_snapshot_reports_blocked_stage(tmp_path, monkeypatch):
     """When a stage raises, completion snapshot must mark the run as blocked and resumable."""
     from engine import state_machine as sm
+    from engine.exceptions import PipelineError
 
     class _DummyOrchestrator:
         def __init__(self, *args, **kwargs):
@@ -186,7 +187,7 @@ def test_execution_loop_snapshot_reports_blocked_stage(tmp_path, monkeypatch):
     monkeypatch.setattr(sm.time, "sleep", lambda _seconds: None)
     machine = sm.OrchestrationStateMachine(workspace_dir=str(tmp_path))
 
-    with pytest.raises(RuntimeError, match="Max retries exceeded"):
+    with pytest.raises(PipelineError, match="Max retries exceeded"):
         machine.execute_pipeline("test prompt")
 
     snapshot = machine.get_completion_snapshot()
@@ -195,3 +196,4 @@ def test_execution_loop_snapshot_reports_blocked_stage(tmp_path, monkeypatch):
     assert snapshot["can_resume"] is True
     assert snapshot["stage_progress"]["PROMPT_RECONSTRUCTION"]["status"] == "completed"
     assert snapshot["stage_progress"]["RESEARCH"]["status"] == "failed"
+    assert snapshot["stage_progress"]["RESEARCH"]["duration_s"] is not None

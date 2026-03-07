@@ -7,6 +7,7 @@ from typing import Any, Callable, Optional
 
 from crewai import Agent, Crew, LLM, Process, Task
 
+from engine.exceptions import ProviderExhaustedError, SoftFailureError
 from engine.llm_config import (
     ModelMatrix,
     ModelTier,
@@ -206,7 +207,12 @@ class CrewAIThreeTierOrchestrator:
             )
             primary_result = llm_call(tier.primary, runner=runner)
             if self._is_soft_failure(primary_result):
-                raise RuntimeError("Primary model returned a soft-failure response.")
+                _, model = self._llm_identity(tier.primary)
+                raise SoftFailureError(
+                    "Primary model returned a soft-failure response.",
+                    stage=stage_name,
+                    model=model,
+                )
             self._emit_provider_attempt(
                 stage=stage_name,
                 tier=tier_name,
@@ -246,7 +252,12 @@ class CrewAIThreeTierOrchestrator:
                 )
                 fallback_result = llm_call(tier.fallback, runner=runner)
                 if self._is_soft_failure(fallback_result):
-                    raise RuntimeError("Fallback model returned a soft-failure response.")
+                    _, model = self._llm_identity(tier.fallback)
+                    raise SoftFailureError(
+                        "Fallback model returned a soft-failure response.",
+                        stage=stage_name,
+                        model=model,
+                    )
                 self._emit_provider_attempt(
                     stage=stage_name,
                     tier=tier_name,
@@ -283,10 +294,14 @@ class CrewAIThreeTierOrchestrator:
                         "error": f"{type(fallback_error).__name__}: {fallback_error}",
                     },
                 )
-                raise RuntimeError(
+                raise ProviderExhaustedError(
                     f"LLM fallback exhausted for stage '{stage_name}' tier '{tier_name}'. "
                     f"Primary failed with {type(primary_error).__name__}: {primary_error}. "
-                    f"Fallback failed with {type(fallback_error).__name__}: {fallback_error}."
+                    f"Fallback failed with {type(fallback_error).__name__}: {fallback_error}.",
+                    stage=stage_name,
+                    primary_error=primary_error,
+                    fallback_error=fallback_error,
+                    tier=tier_name,
                 ) from fallback_error
 
     def reconstruct_prompt(self, raw_prompt: str) -> str:
@@ -404,27 +419,34 @@ class CrewAIThreeTierOrchestrator:
         context_block: str | None = None,
     ) -> str:
         """
-        Executes the main 3-tier Crew using a hierarchical process:
-          - Manager/router: orchestration-tier models
-          - Senior agents: level1-tier models
-          - Worker agent: level2-tier models
+        Executes the main 3-tier Crew using a hierarchical process.
+
+        Uses _run_stage_with_tier_fallback for the orchestration tier, composing
+        all three tiers internally via use_fallback propagation.
         """
 
-        def _run_once(*, use_fallback: bool) -> str:
+        def _build_crew(self_ref: "CrewAIThreeTierOrchestrator", *, use_fallback: bool) -> str:
             orchestration_llm = (
-                self.models.orchestration.fallback
+                self_ref.models.orchestration.fallback
                 if use_fallback
-                else self.models.orchestration.primary
+                else self_ref.models.orchestration.primary
             )
-            level1_llm = self.models.level1.fallback if use_fallback else self.models.level1.primary
-            level2_llm = self.models.level2.fallback if use_fallback else self.models.level2.primary
+            level1_llm = (
+                self_ref.models.level1.fallback if use_fallback else self_ref.models.level1.primary
+            )
+            level2_llm = (
+                self_ref.models.level2.fallback if use_fallback else self_ref.models.level2.primary
+            )
 
             manager = Agent(
                 role="Orchestration Tier Manager/Router",
                 goal="Plan, delegate, and validate completion using strict success-criteria enforcement.",
-                backstory="You are a CTO-level manager agent. You delegate to senior and worker agents, enforce single-source-of-truth, and reject placeholder output.",
+                backstory=(
+                    "You are a CTO-level manager agent. You delegate to senior and worker agents, "
+                    "enforce single-source-of-truth, and reject placeholder output."
+                ),
                 llm=orchestration_llm,
-                verbose=self.verbose,
+                verbose=self_ref.verbose,
                 allow_delegation=True,
                 reasoning=True,
                 max_reasoning_attempts=3,
@@ -435,13 +457,13 @@ class CrewAIThreeTierOrchestrator:
                 goal="Decompose objectives and produce an execution plan with strict acceptance criteria per task.",
                 backstory="You are a senior systems architect. You translate requirements into executable work packages and guardrails.",
                 llm=level1_llm,
-                verbose=self.verbose,
+                verbose=self_ref.verbose,
                 allow_delegation=True,
                 reasoning=True,
                 max_reasoning_attempts=3,
             )
 
-            worker_tools = self._build_worker_tools()
+            worker_tools = self_ref._build_worker_tools()
             tooling_manifest = (
                 "Tooling Manifest:\n"
                 "- workspace_file_read/workspace_file_write: read/write files under the active workspace only.\n"
@@ -461,7 +483,7 @@ class CrewAIThreeTierOrchestrator:
                     f"{tooling_manifest}"
                 ),
                 llm=level2_llm,
-                verbose=self.verbose,
+                verbose=self_ref.verbose,
                 allow_delegation=False,
                 tools=worker_tools,
                 reasoning=True,
@@ -497,101 +519,32 @@ class CrewAIThreeTierOrchestrator:
                 manager_agent=manager,
                 memory=True,
                 planning=False,
-                verbose=self.verbose,
+                verbose=self_ref.verbose,
                 cache=True,
             )
-            return self._extract_final_answer(str(crew.kickoff()))
+            return self_ref._extract_final_answer(str(crew.kickoff()))
 
-        try:
-            self._emit_provider_attempt(
-                stage="execution_hierarchical",
-                tier="orchestration",
-                llm=self.models.orchestration.primary,
-                attempt=1,
-                fallback_used=False,
-                status="started",
-            )
-            result = _run_once(use_fallback=False)
-            if self._is_soft_failure(result):
-                raise RuntimeError("Primary execute run returned a soft-failure response.")
-            self._emit_provider_attempt(
-                stage="execution_hierarchical",
-                tier="orchestration",
-                llm=self.models.orchestration.primary,
-                attempt=1,
-                fallback_used=False,
-                status="success",
-            )
-        except Exception as primary_error:
-            self._emit_provider_attempt(
-                stage="execution_hierarchical",
-                tier="orchestration",
-                llm=self.models.orchestration.primary,
-                attempt=1,
-                fallback_used=False,
-                status="failed",
-                error=primary_error,
-            )
-            self._emit_telemetry(
-                "FALLBACK_ATTEMPT",
-                {
-                    "stage": "execution_hierarchical",
-                    "tier": "all",
-                    "reason": f"{type(primary_error).__name__}: {primary_error}",
-                },
-            )
-            try:
-                self._emit_provider_attempt(
-                    stage="execution_hierarchical",
-                    tier="orchestration",
-                    llm=self.models.orchestration.fallback,
-                    attempt=2,
-                    fallback_used=True,
-                    status="started",
-                )
-                result = _run_once(use_fallback=True)
-                if self._is_soft_failure(result):
-                    raise RuntimeError("Fallback execute run returned a soft-failure response.")
-                self._emit_provider_attempt(
-                    stage="execution_hierarchical",
-                    tier="orchestration",
-                    llm=self.models.orchestration.fallback,
-                    attempt=2,
-                    fallback_used=True,
-                    status="success",
-                )
-                self._emit_telemetry(
-                    "FALLBACK_RESULT",
-                    {
-                        "stage": "execution_hierarchical",
-                        "tier": "all",
-                        "status": "success",
-                    },
-                )
-            except Exception as fallback_error:
-                self._emit_provider_attempt(
-                    stage="execution_hierarchical",
-                    tier="orchestration",
-                    llm=self.models.orchestration.fallback,
-                    attempt=2,
-                    fallback_used=True,
-                    status="failed",
-                    error=fallback_error,
-                )
-                self._emit_telemetry(
-                    "FALLBACK_RESULT",
-                    {
-                        "stage": "execution_hierarchical",
-                        "tier": "all",
-                        "status": "failed",
-                        "error": f"{type(fallback_error).__name__}: {fallback_error}",
-                    },
-                )
-                raise RuntimeError(
-                    "LLM fallback exhausted for stage 'execution_hierarchical'. "
-                    f"Primary failed with {type(primary_error).__name__}: {primary_error}. "
-                    f"Fallback failed with {type(fallback_error).__name__}: {fallback_error}."
-                ) from fallback_error
+        def _primary_runner(llm: LLM) -> str:
+            return _build_crew(self, use_fallback=False)
+
+        def _fallback_runner(llm: LLM) -> str:
+            return _build_crew(self, use_fallback=True)
+
+        from engine.llm_config import ModelTier as _MT
+
+        synthetic_tier = _MT(
+            primary=self.models.orchestration.primary,
+            fallback=self.models.orchestration.fallback,
+        )
+
+        result = self._run_stage_with_tier_fallback(
+            stage_name="execution_hierarchical",
+            tier_name="orchestration",
+            tier=synthetic_tier,
+            runner=lambda llm: (
+                _primary_runner(llm) if llm is synthetic_tier.primary else _fallback_runner(llm)
+            ),
+        )
 
         write_workspace_file(self.workspace, ".agent/tmp/final_output.md", result)
         return result

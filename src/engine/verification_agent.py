@@ -5,8 +5,8 @@ from typing import Any, Dict, List
 
 from engine.verification_primitives import (
     contains_banned_markers,
-    extract_python_blocks,
-    has_empty_implementations,
+    extract_code_blocks,
+    validate_code_block,
 )
 
 
@@ -55,10 +55,10 @@ class VerificationAgent:
         syntax_errors: List[str] = []
         empty_impl_count = 0
 
-        for block in extract_python_blocks(output):
-            has_empty, parse_error = has_empty_implementations(block)
-            if parse_error is not None:
-                syntax_errors.append(str(parse_error))
+        for block in extract_code_blocks(output):
+            has_empty, syntax_error, _validated = validate_code_block(block)
+            if syntax_error is not None:
+                syntax_errors.append(str(syntax_error))
             if has_empty:
                 empty_impl_count += 1
 
@@ -69,4 +69,3 @@ class VerificationAgent:
             syntax_errors=syntax_errors,
             empty_implementations=empty_impl_count,
         )
-

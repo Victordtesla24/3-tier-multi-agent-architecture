@@ -73,6 +73,26 @@ def test_simulated_llm_failure_injection(mock_workspace):
     assert call_count["count"] == 2, f"Expected exactly 2 calls, got {call_count['count']}"
 
 
+def test_retry_exhaustion_raises_pipeline_error(mock_workspace):
+    from unittest.mock import patch as _patch
+
+    from engine.exceptions import PipelineError
+    from engine.state_machine import OrchestrationStateMachine
+
+    machine = OrchestrationStateMachine(workspace_dir=mock_workspace)
+
+    def always_fail(*_args):
+        raise TimeoutError("provider timed out")
+
+    with _patch("engine.state_machine.time.sleep"):
+        with pytest.raises(PipelineError, match="Max retries exceeded") as exc_info:
+            machine._execute_with_backoff(always_fail, stage_name="unit_test_retry_exhaustion")
+
+    assert exc_info.value.stage == "unit_test_retry_exhaustion"
+    assert exc_info.value.metadata["attempts"] == machine.max_retries
+    assert exc_info.value.metadata["last_error_type"] == "TimeoutError"
+
+
 def test_memory_telemetry_validation(mock_workspace):
     """Memory/telemetry validation for Continuous Learning proposals."""
     from engine.state_machine import OrchestrationStateMachine
@@ -173,12 +193,29 @@ def test_research_context_is_normalised_to_schema(mock_workspace):
     assert "## RiskNotes[]" in normalised
 
 
+def test_research_quality_gate_raises_structured_error(mock_workspace):
+    from engine.exceptions import ResearchEmptyError
+    from engine.state_machine import OrchestrationStateMachine
+
+    machine = OrchestrationStateMachine(
+        workspace_dir=mock_workspace,
+        fail_on_research_empty=True,
+    )
+
+    with pytest.raises(ResearchEmptyError, match="expected at least 2 citation URLs"):
+        machine._enforce_research_quality(
+            "build me a tested CLI",
+            "## Summary\n- No citations found.\n",
+        )
+
+
 def test_provider_4xx_budget_enforced(mock_workspace):
     from engine.state_machine import OrchestrationStateMachine
+    from engine.exceptions import PipelineError
 
     machine = OrchestrationStateMachine(workspace_dir=mock_workspace, max_provider_4xx=1)
     machine._record_httpx_status(400, 'HTTP Request: "HTTP/1.1 400 Bad Request"')
     machine._record_httpx_status(401, 'HTTP Request: "HTTP/1.1 401 Unauthorized"')
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(PipelineError):
         machine._enforce_provider_error_budget("unit_test_budget")

@@ -11,6 +11,7 @@ from typing import Dict, Any, Tuple
 from engine.context_builder import build_orchestration_context_block
 from engine.continuous_learning import apply_architecture_upgrade, generate_improvement_proposal
 from engine.crew_orchestrator import CrewAIThreeTierOrchestrator
+from engine.exceptions import PipelineError, ResearchEmptyError, VerificationFailedError
 from engine.llm_config import classify_provider_error
 from engine.verification_agent import VerificationAgent
 
@@ -77,6 +78,8 @@ class OrchestrationStateMachine:
         self.completion_summary = "Execution has not started."
         self.failed_stage: str | None = None
         self.stage_progress: Dict[str, Dict[str, Any]] = {}
+        self._stage_started_monotonic: Dict[str, float] = {}
+        self._last_verification_error: VerificationFailedError | None = None
         self._reset_execution_tracking()
 
         # Ensure observability path exists
@@ -90,16 +93,52 @@ class OrchestrationStateMachine:
         self.completion_status = "pending"
         self.completion_summary = "Execution has not started."
         self.failed_stage = None
+        self._stage_started_monotonic = {}
+        self._last_verification_error = None
         self.stage_progress = {
-            stage: {"status": "pending", "notes": None}
+            stage: {
+                "status": "pending",
+                "notes": None,
+                "started_at": None,
+                "finished_at": None,
+                "duration_s": None,
+            }
             for stage in self._PIPELINE_STAGES
         }
 
+    @staticmethod
+    def _current_timestamp() -> str:
+        return datetime.now(timezone.utc).isoformat()
+
     def _mark_stage(self, stage: str, status: str, notes: str | None = None) -> None:
         if stage not in self.stage_progress:
-            self.stage_progress[stage] = {"status": "pending", "notes": None}
-        self.stage_progress[stage]["status"] = status
-        self.stage_progress[stage]["notes"] = notes
+            self.stage_progress[stage] = {
+                "status": "pending",
+                "notes": None,
+                "started_at": None,
+                "finished_at": None,
+                "duration_s": None,
+            }
+
+        payload = self.stage_progress[stage]
+        payload["status"] = status
+        payload["notes"] = notes
+
+        if status == "in_progress":
+            payload["started_at"] = payload.get("started_at") or self._current_timestamp()
+            payload["finished_at"] = None
+            payload["duration_s"] = None
+            self._stage_started_monotonic[stage] = time.monotonic()
+        elif status in {"completed", "failed", "failed_non_blocking"}:
+            finished_at = self._current_timestamp()
+            payload["started_at"] = payload.get("started_at") or finished_at
+            payload["finished_at"] = finished_at
+            started_monotonic = self._stage_started_monotonic.pop(stage, None)
+            if started_monotonic is not None:
+                payload["duration_s"] = round(time.monotonic() - started_monotonic, 3)
+            elif payload.get("duration_s") is None:
+                payload["duration_s"] = 0.0
+
         if status == "failed":
             self.failed_stage = stage
 
@@ -111,6 +150,9 @@ class OrchestrationStateMachine:
             stage: {
                 "status": payload.get("status"),
                 "notes": payload.get("notes"),
+                "started_at": payload.get("started_at"),
+                "finished_at": payload.get("finished_at"),
+                "duration_s": payload.get("duration_s"),
             }
             for stage, payload in self.stage_progress.items()
         }
@@ -147,10 +189,12 @@ class OrchestrationStateMachine:
     def _execute_with_backoff(self, func, *args, stage_name: str = "unknown"):
         """Standard exponential backoff wrapper for API stability."""
         retries = 0
+        last_error: Exception | None = None
         while retries < self.max_retries:
             try:
                 return func(*args)
             except Exception as e:
+                last_error = e
                 classified = classify_provider_error(e)
                 self._structured_log(
                     "PROVIDER_ATTEMPT",
@@ -181,7 +225,16 @@ class OrchestrationStateMachine:
                     f"Execution failed: {e}. Retrying in {sleep_time}s ({retries}/{self.max_retries})"
                 )
                 time.sleep(sleep_time)
-        raise RuntimeError("Max retries exceeded during agent execution.")
+        raise PipelineError(
+            "Max retries exceeded during agent execution.",
+            stage=stage_name,
+            metadata={
+                "attempts": retries,
+                "max_retries": self.max_retries,
+                "last_error_type": type(last_error).__name__ if last_error else None,
+                "last_error": str(last_error) if last_error else None,
+            },
+        )
 
     def _record_orchestrator_event(self, event_type: str, details: dict) -> None:
         """Telemetry bridge for orchestrator-level events (fallback attempts/results)."""
@@ -214,9 +267,11 @@ class OrchestrationStateMachine:
 
     def _enforce_provider_error_budget(self, stage_name: str) -> None:
         if self.provider_4xx_count > self.max_provider_4xx:
-            raise RuntimeError(
+            raise PipelineError(
                 "Provider 4xx error budget exhausted "
-                f"({self.provider_4xx_count}>{self.max_provider_4xx}) during stage '{stage_name}'."
+                f"({self.provider_4xx_count}>{self.max_provider_4xx}) during stage '{stage_name}'.",
+                stage=stage_name,
+                metadata={"4xx_count": self.provider_4xx_count, "budget": self.max_provider_4xx},
             )
 
     @staticmethod
@@ -231,9 +286,66 @@ class OrchestrationStateMachine:
             return
         citations = self._extract_citation_urls(research_context)
         if len(citations) < 2:
-            raise RuntimeError(
-                "Research quality gate failed: fewer than 2 citation URLs were returned."
+            raise ResearchEmptyError(
+                "Research quality gate failed: expected at least 2 citation URLs, "
+                f"found {len(citations)}."
             )
+
+    def _build_pipeline_complete_details(
+        self,
+        *,
+        success: bool,
+        error: Exception | None = None,
+    ) -> Dict[str, Any]:
+        details: Dict[str, Any] = {
+            "success": success,
+            **self.get_completion_snapshot(),
+        }
+        if error is not None:
+            details["error_type"] = type(error).__name__
+            details["error"] = str(error)
+            if isinstance(error, PipelineError) and error.metadata:
+                details["error_metadata"] = dict(error.metadata)
+        elif not success and self.failed_stage == "VERIFICATION":
+            details["error_type"] = "VerificationFailedError"
+            details["error"] = "Verification gate rejected final output."
+
+        if self._last_verification_error is not None:
+            details["verification"] = {
+                "banned_markers": list(self._last_verification_error.banned_markers),
+                "syntax_errors": list(self._last_verification_error.syntax_errors),
+                "empty_implementations": self._last_verification_error.empty_implementations,
+            }
+
+        return details
+
+    def _verify_results_or_raise(self, results: dict) -> None:
+        output = str(results.get("final_output", ""))
+        report = VerificationAgent().evaluate(output)
+        if report.success:
+            return
+        raise VerificationFailedError(
+            "Verification gate rejected final output.",
+            banned_markers=report.banned_markers,
+            syntax_errors=report.syntax_errors,
+            empty_implementations=report.empty_implementations,
+        )
+
+    @staticmethod
+    def _log_verification_failure(error: VerificationFailedError) -> None:
+        if error.banned_markers:
+            markers = ", ".join(error.banned_markers)
+            logger.error(
+                "Verification failed: detected banned lexical markers: %s",
+                markers,
+            )
+        for syntax_error in error.syntax_errors:
+            logger.error(
+                "Verification failed: AST SyntaxError in generated code - %s",
+                syntax_error,
+            )
+        if error.empty_implementations:
+            logger.error("Verification failed: AST detected empty implementation (pass).")
 
     def execute_pipeline_with_metadata(self, raw_prompt: str) -> Tuple[bool, Dict[str, Any]]:
         """
@@ -366,7 +478,7 @@ class OrchestrationStateMachine:
                 self.completion_summary = "Pipeline completed successfully and passed verification."
                 self._structured_log(
                     "PIPELINE_COMPLETE",
-                    {"success": True, **self.get_completion_snapshot()},
+                    self._build_pipeline_complete_details(success=True),
                 )
                 return True
 
@@ -382,7 +494,10 @@ class OrchestrationStateMachine:
             )
             self._structured_log(
                 "PIPELINE_COMPLETE",
-                {"success": False, **self.get_completion_snapshot()},
+                self._build_pipeline_complete_details(
+                    success=False,
+                    error=self._last_verification_error,
+                ),
             )
             return False
         except Exception as exc:
@@ -394,7 +509,7 @@ class OrchestrationStateMachine:
             )
             self._structured_log(
                 "PIPELINE_COMPLETE",
-                {"success": False, **self.get_completion_snapshot()},
+                self._build_pipeline_complete_details(success=False, error=exc),
             )
             raise
         finally:
@@ -405,13 +520,11 @@ class OrchestrationStateMachine:
         Production-grade verification gating.
         Executes AST structural parsing and strict lexical constraint checking.
         """
-        output = str(results.get("final_output", ""))
-
-        agent = VerificationAgent()
-        report = agent.evaluate(output)
-        if report.success:
-            return True
-
-        for message in report.errors:
-            logger.error(message)
-        return False
+        self._last_verification_error = None
+        try:
+            self._verify_results_or_raise(results)
+        except VerificationFailedError as error:
+            self._last_verification_error = error
+            self._log_verification_failure(error)
+            return False
+        return True

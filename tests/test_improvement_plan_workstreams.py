@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -8,13 +9,17 @@ import pytest
 
 sys.path.append(str(Path(__file__).parent.parent / "src"))
 
+from engine.continuous_learning import generate_improvement_proposal
 from engine.context_builder import build_orchestration_context_block
 from engine.orchestration_tools import run_benchmarks, run_tests
 from engine.project_root_tools import ProjectRootFileReadTool, ProjectRootFileWriteTool
 from engine.verification_primitives import (
     contains_banned_markers,
+    extract_code_blocks,
     extract_python_blocks,
     has_empty_implementations,
+    validate_javascript_syntax,
+    validate_shell_syntax,
 )
 
 
@@ -39,6 +44,41 @@ def test_verification_primitives_flag_empty_implementation():
     has_empty, parse_error = has_empty_implementations(block)
     assert parse_error is None
     assert has_empty is True
+
+
+def test_verification_primitives_extract_multi_language_blocks():
+    output = (
+        "```javascript\nconst x = 1;\n```\n"
+        "```bash\necho ok\n```\n"
+    )
+    blocks = extract_code_blocks(output)
+
+    assert [(block.language, block.source) for block in blocks] == [
+        ("javascript", "const x = 1;"),
+        ("bash", "echo ok"),
+    ]
+
+
+def test_verification_primitives_detect_javascript_not_implemented_marker():
+    hits = contains_banned_markers('throw new Error("not implemented")')
+    assert "JS NotImplemented throw" in hits
+
+
+def test_verification_primitives_validate_javascript_and_shell_syntax():
+    js_error = validate_javascript_syntax("const = ;")
+    shell_error = validate_shell_syntax("if then")
+
+    if shutil.which("node") is None:
+        assert js_error is None
+    else:
+        assert js_error is not None
+        assert "SyntaxError" in js_error
+
+    if shutil.which("bash") is None:
+        assert shell_error is None
+    else:
+        assert shell_error is not None
+        assert "syntax error" in shell_error.lower()
 
 
 def test_context_builder_produces_required_sections(tmp_path):
@@ -73,6 +113,50 @@ def test_context_builder_produces_required_sections(tmp_path):
     assert "strict_provider_validation: True" in context
     assert "max_provider_4xx: 12" in context
     assert "## Recent Execution Activity" in context
+
+
+def test_generate_improvement_proposal_reads_nested_pipeline_complete_events(tmp_path):
+    workspace = tmp_path / "workspace"
+    log_dir = workspace / ".agent" / "memory"
+    log_dir.mkdir(parents=True)
+    (log_dir / "execution_log.json").write_text(
+        json.dumps(
+            {
+                "executions": [
+                    {
+                        "timestamp": "2026-03-07T00:00:00Z",
+                        "run_id": "run-1",
+                        "state": "RESEARCH",
+                        "event": "PIPELINE_COMPLETE",
+                        "details": {
+                            "success": False,
+                            "completion_status": "blocked",
+                            "failed_stage": "RESEARCH",
+                            "error_type": "TimeoutError",
+                            "error": "timed out while querying provider",
+                            "stage_progress": {
+                                "RESEARCH": {
+                                    "status": "failed",
+                                    "notes": "timed out",
+                                    "started_at": "2026-03-07T00:00:00Z",
+                                    "finished_at": "2026-03-07T00:01:12Z",
+                                    "duration_s": 72.4,
+                                }
+                            },
+                        },
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    proposal = generate_improvement_proposal(workspace)
+
+    assert "Analyzed 1 recorded pipeline execution(s)" in proposal
+    assert "[RESEARCH] TimeoutError: 1 occurrence(s)" in proposal
+    assert "RESEARCH: median 72.4s across 1 samples" in proposal
+    assert "Stage 'RESEARCH' timed out in 100% of runs." in proposal
 
 
 def test_project_root_tools_enforce_whitelist(tmp_path):

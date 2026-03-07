@@ -7,7 +7,7 @@
 
 The Antigravity 3-Tier Multi-Agent Architecture represents a paradigm shift in autonomous, production-grade software engineering and enterprise orchestration. Designed explicitly for organizations operating at scale, this framework leverages advanced large language models (LLMs) coordinated through a deterministic, self-healing pipeline. By integrating the CrewAI orchestration layer with a proprietary tri-level agent hierarchy, the architecture ensures that complex requirements are decomposed, executed, and validated with programmatic precision.
 
-At its core, the solution addresses the persistent challenge of execution reliability within generative AI applications. Traditional single-agent systems frequently falter under the weight of complex, multi-step engineering tasks, often yielding syntactically correct but functionally simulated outputs. The Antigravity framework resolves this through a stringent 1:1 Requirement-to-Instruction mapping protocol and a mathematically rigorous Abstract Syntax Tree (AST) validation gateway. This zero-tolerance policy for simulated code or unverified placeholders guarantees that the output generated is inherently deployment-ready.
+At its core, the solution addresses the persistent challenge of execution reliability within generative AI applications. Traditional single-agent systems frequently falter under the weight of complex, multi-step engineering tasks, often yielding syntactically correct but functionally simulated outputs. The Antigravity framework resolves this through a stringent 1:1 Requirement-to-Instruction mapping protocol and a mathematically rigorous multi-language verification gateway that parses Python and performs syntax checks for JavaScript, TypeScript, and shell fenced blocks. This zero-tolerance policy for simulated code or unverified placeholders guarantees that the output generated is inherently deployment-ready.
 
 The key value proposition lies in the convergence of speed, scale, and operational certainty. By transforming the software development lifecycle from a human-bottlenecked process into an autonomous, scalable engine, enterprises can immediately capture unprecedented time-to-market advantages. The architecture not only accelerates development but structurally remediates technical debt in real-time through continuous self-learning mechanisms, aligning directly with the core tenets of modern enterprise digital transformation.
 
@@ -88,7 +88,7 @@ Deploying autonomous systems within the enterprise requires stringent safeguards
 
 **Core Governance Mechanisms:**
 
-*   **Abstract Syntax Tree (AST) Verification Gates:** A strict zero-tolerance policy for simulated code or unverified placeholders. Before output is serialized or merged, it undergoes rigorous AST parsing. Non-compliant, hallucinated, or malformed logic is systematically rejected, and the execution is autonomously routed back for remediation.
+*   **Abstract Syntax Tree (AST) and Syntax Verification Gates:** A strict zero-tolerance policy for simulated code or unverified placeholders. Before output is serialized or merged, Python code undergoes AST parsing, while JavaScript, TypeScript, and shell fenced blocks undergo language-appropriate syntax validation. Non-compliant, hallucinated, or malformed logic is systematically rejected, and the execution is autonomously routed back for remediation.
 *   **Multi-Model Redundancy & Soft-Failure Detection:** The proprietary routing mechanism perpetually monitors primary API streams. Upon connection exhaustion, rate-limiting, or structural refusal, the proxy seamlessly cascades traffic to pre-configured localized or secondary LLM instances. This guarantees business continuity.
 *   **Deterministic Workspaces:** All telemetry, code generation, and memory matrices are forcibly constrained to isolated, authorized directories. This structural containment prevents unauthorized system permutation and guarantees data provenance for subsequent auditing.
 *   **Human-In-The-Loop (HITL) Upgrade Authorizations:** While the system operates autonomously during routine tasks, all structural, macro-level architectural refinements detected by the Continuous Learning Agent are immediately paused, requiring explicit human authorization prior to instantiation.
@@ -99,7 +99,7 @@ The architecture is designed contrary to static frameworks; it is inherently a s
 
 **Strategic Evolution Horizons:**
 
-*   **Automated Intelligence Harvesting:** The Continuous Learning module analyzes all deployment telemetry and structural logic iterations post-execution. It algorithmically proposes operational enhancements, streamlining its efficiency curve continuously.
+*   **Automated Intelligence Harvesting:** The Continuous Learning module analyzes structured pipeline-completion telemetry, clusters recurring failure modes, tracks stage latency, and proposes WHAT/WHY/HOW operational enhancements from observed execution data.
 *   **Ecosystem Expansion:** Current support centers on core commercial and robust open-weights models. The roadmap dictates a frictionless expansion to incorporate hyper-localized, on-premises corporate models for strict data sovereignty compliance.
 *   **Advanced Threat Modeling:** Incorporating native Level 2 specialized sub-agents exclusively dedicated to preemptive security fuzzing and vulnerability scanning prior to any repository commit.
 
@@ -236,7 +236,7 @@ flowchart TD
 The system is designed to trigger autonomously. You do not need to invoke specific rules.
 1. **Submit your prompt**: Describe your objective.
 2. **Watch the orchestration in action**: The CrewAI Orchestrator will convert your raw input into a highly optimized, deterministic system prompt and delegate it through its Crew of specialized agents.
-3. **Review Continuous Learning Proposals**: Once a task finishes successfully, the Continuous Learning Agent evaluates the result. If it discovers pattern optimizations, it will **HALT** and prompt you with:
+3. **Review Continuous Learning Proposals**: Once a task finishes successfully, the Continuous Learning Agent evaluates the result using structured pipeline telemetry, failure-mode clustering, and stage-duration analysis. If it discovers pattern optimizations, it will **HALT** and prompt you with:
    - **WHAT**: The proposed change.
    - **WHY**: The data-backed reasoning.
    - **HOW**: The expected benefits.
