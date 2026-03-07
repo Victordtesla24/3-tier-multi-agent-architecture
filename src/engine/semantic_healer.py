@@ -6,7 +6,6 @@ them if semantic drift or placeholder content is detected.
 import hashlib
 import json
 import logging
-import os
 import re
 import sys
 from datetime import datetime, timezone

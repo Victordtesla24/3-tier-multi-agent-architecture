@@ -3,14 +3,16 @@ import time
 import json
 import os
 import re
-import ast
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Tuple
 
+from engine.context_builder import build_orchestration_context_block
+from engine.continuous_learning import apply_architecture_upgrade, generate_improvement_proposal
 from engine.crew_orchestrator import CrewAIThreeTierOrchestrator
 from engine.llm_config import classify_provider_error
+from engine.verification_agent import VerificationAgent
 
 logger = logging.getLogger("AntigravityEngine")
 
@@ -45,10 +47,19 @@ class OrchestrationStateMachine:
       - Verification gate that rejects placeholder / simulated output
     """
 
+    _PIPELINE_STAGES = (
+        "PROMPT_RECONSTRUCTION",
+        "RESEARCH",
+        "ORCHESTRATION_L1",
+        "VERIFICATION",
+        "CONTINUOUS_LEARNING",
+    )
+
     def __init__(
         self,
         workspace_dir: str,
         *,
+        verbose: bool = False,
         strict_provider_validation: bool = True,
         max_provider_4xx: int = 50,
         fail_on_research_empty: bool = False,
@@ -56,11 +67,17 @@ class OrchestrationStateMachine:
         self.workspace = workspace_dir
         self.state = "INIT"
         self.max_retries = 3
+        self.verbose = verbose
         self.strict_provider_validation = strict_provider_validation
         self.max_provider_4xx = max_provider_4xx
         self.fail_on_research_empty = fail_on_research_empty
         self.provider_4xx_count = 0
         self.run_id: str | None = None
+        self.completion_status = "pending"
+        self.completion_summary = "Execution has not started."
+        self.failed_stage: str | None = None
+        self.stage_progress: Dict[str, Dict[str, Any]] = {}
+        self._reset_execution_tracking()
 
         # Ensure observability path exists
         self.log_path = os.path.join(self.workspace, ".agent", "memory", "execution_log.json")
@@ -68,6 +85,44 @@ class OrchestrationStateMachine:
         if not os.path.exists(self.log_path):
             with open(self.log_path, "w") as f:
                 json.dump({"executions": []}, f)
+
+    def _reset_execution_tracking(self) -> None:
+        self.completion_status = "pending"
+        self.completion_summary = "Execution has not started."
+        self.failed_stage = None
+        self.stage_progress = {
+            stage: {"status": "pending", "notes": None}
+            for stage in self._PIPELINE_STAGES
+        }
+
+    def _mark_stage(self, stage: str, status: str, notes: str | None = None) -> None:
+        if stage not in self.stage_progress:
+            self.stage_progress[stage] = {"status": "pending", "notes": None}
+        self.stage_progress[stage]["status"] = status
+        self.stage_progress[stage]["notes"] = notes
+        if status == "failed":
+            self.failed_stage = stage
+
+    def get_completion_snapshot(self) -> Dict[str, Any]:
+        completed_count = sum(
+            1 for payload in self.stage_progress.values() if payload.get("status") == "completed"
+        )
+        stage_progress = {
+            stage: {
+                "status": payload.get("status"),
+                "notes": payload.get("notes"),
+            }
+            for stage, payload in self.stage_progress.items()
+        }
+        return {
+            "completion_status": self.completion_status,
+            "completion_summary": self.completion_summary,
+            "failed_stage": self.failed_stage,
+            "stage_progress": stage_progress,
+            "completed_stage_count": completed_count,
+            "total_stage_count": len(self.stage_progress),
+            "can_resume": self.completion_status == "blocked",
+        }
 
     def _structured_log(self, event_type: str, details: dict):
         """Appends structured JSON telemetry to the central memory file."""
@@ -180,20 +235,46 @@ class OrchestrationStateMachine:
                 "Research quality gate failed: fewer than 2 citation URLs were returned."
             )
 
+    def execute_pipeline_with_metadata(self, raw_prompt: str) -> Tuple[bool, Dict[str, Any]]:
+        """
+        Executes the pipeline and returns (success, metadata) for orchestration APIs.
+
+        Metadata includes stable, machine-readable pointers to core artefacts so
+        callers (CLI, MCP tools, UI backends) do not have to replicate path logic.
+        """
+        success = self.execute_pipeline(raw_prompt)
+
+        workspace_path = Path(self.workspace).resolve()
+        tmp_dir = workspace_path / ".agent" / "tmp"
+        memory_dir = workspace_path / ".agent" / "memory"
+
+        metadata: Dict[str, Any] = {
+            "run_id": self.run_id,
+            "execution_log_path": str(memory_dir / "execution_log.json"),
+            "final_output_path": str(tmp_dir / "final_output.md"),
+            "reconstructed_prompt_path": str(tmp_dir / "reconstructed_prompt.md"),
+            "research_context_path": str(tmp_dir / "research-context.md"),
+            "provider_4xx_count": self.provider_4xx_count,
+        }
+        metadata.update(self.get_completion_snapshot())
+        return success, metadata
+
     def execute_pipeline(self, raw_prompt: str) -> bool:
         self.run_id = str(uuid.uuid4())
         self.provider_4xx_count = 0
+        self._reset_execution_tracking()
         httpx_logger = logging.getLogger("httpx")
         httpx_handler = _HTTPStatusCaptureHandler(self._record_httpx_status)
         httpx_logger.addHandler(httpx_handler)
         logger.info("Transitioning to state: PROMPT_RECONSTRUCTION")
         self.state = "PROMPT_RECONSTRUCTION"
+        self._mark_stage(self.state, "in_progress", "Reconstructing prompt from raw input.")
         try:
             self._structured_log("STATE_TRANSITION", {"raw_prompt_length": len(raw_prompt)})
 
             orchestrator = CrewAIThreeTierOrchestrator(
                 workspace_dir=self.workspace,
-                verbose=True,
+                verbose=self.verbose,
                 strict_provider_validation=self.strict_provider_validation,
                 run_id=self.run_id,
                 telemetry_hook=self._record_orchestrator_event,
@@ -205,9 +286,11 @@ class OrchestrationStateMachine:
                 stage_name="prompt_reconstruction",
             )
             self._enforce_provider_error_budget("prompt_reconstruction")
+            self._mark_stage("PROMPT_RECONSTRUCTION", "completed", "Prompt reconstructed.")
 
             logger.info("Transitioning to state: RESEARCH")
             self.state = "RESEARCH"
+            self._mark_stage(self.state, "in_progress", "Collecting research context.")
             self._structured_log("STATE_TRANSITION", {"status": "started"})
             research_context = self._execute_with_backoff(
                 orchestrator.run_research,
@@ -216,32 +299,104 @@ class OrchestrationStateMachine:
             )
             self._enforce_provider_error_budget("research")
             self._enforce_research_quality(raw_prompt, research_context)
+            self._mark_stage("RESEARCH", "completed", "Research context collected.")
 
             logger.info("Transitioning to state: ORCHESTRATION_L1")
             self.state = "ORCHESTRATION_L1"
+            self._mark_stage(
+                self.state,
+                "in_progress",
+                "Delegating hierarchical execution to crew manager and worker agents.",
+            )
             self._structured_log("STATE_TRANSITION", {"status": "delegating_to_crewai"})
+            context_block = build_orchestration_context_block(
+                workspace=Path(self.workspace),
+                project_root=Path(__file__).resolve().parents[2],
+                strict_provider_validation=self.strict_provider_validation,
+                max_provider_4xx=self.max_provider_4xx,
+                fail_on_research_empty=self.fail_on_research_empty,
+            )
             final_output = self._execute_with_backoff(
                 orchestrator.execute,
                 reconstructed,
                 research_context,
+                context_block,
                 stage_name="execution_hierarchical",
             )
             self._enforce_provider_error_budget("execution_hierarchical")
+            self._mark_stage("ORCHESTRATION_L1", "completed", "Hierarchical execution finished.")
 
             logger.info("Transitioning to state: VERIFICATION")
             self.state = "VERIFICATION"
+            self._mark_stage(self.state, "in_progress", "Running verification gate.")
             self._structured_log("STATE_TRANSITION", {"status": "validating_results"})
 
             results: Dict[str, Any] = {"final_output": final_output}
 
             if self._run_verification_scoring(results):
+                self._mark_stage("VERIFICATION", "completed", "Verification gate passed.")
                 logger.info("Pipeline successful. Verification Passed.")
-                self._structured_log("PIPELINE_COMPLETE", {"success": True})
+                self.state = "CONTINUOUS_LEARNING"
+                self._mark_stage(
+                    self.state,
+                    "in_progress",
+                    "Generating and optionally applying continuous-learning proposal.",
+                )
+                # Best-effort continuous-learning stage; never blocks the run.
+                try:
+                    proposal = generate_improvement_proposal(Path(self.workspace))
+                    apply_architecture_upgrade(
+                        Path(self.workspace),
+                        proposal,
+                        approval_token=os.environ.get("ANTIGRAVITY_CL_APPROVAL", "").strip(),
+                    )
+                    self._mark_stage(
+                        "CONTINUOUS_LEARNING",
+                        "completed",
+                        "Continuous-learning proposal processed.",
+                    )
+                except Exception as exc:
+                    logger.warning("Continuous-learning stage failed: %s", exc)
+                    self._mark_stage(
+                        "CONTINUOUS_LEARNING",
+                        "failed_non_blocking",
+                        f"{type(exc).__name__}: {exc}",
+                    )
+                self.completion_status = "success"
+                self.completion_summary = "Pipeline completed successfully and passed verification."
+                self._structured_log(
+                    "PIPELINE_COMPLETE",
+                    {"success": True, **self.get_completion_snapshot()},
+                )
                 return True
 
             logger.error("Pipeline failed verification constraints.")
-            self._structured_log("PIPELINE_COMPLETE", {"success": False})
+            self._mark_stage(
+                "VERIFICATION",
+                "failed",
+                "Verification gate rejected final output.",
+            )
+            self.completion_status = "partial"
+            self.completion_summary = (
+                "Pipeline produced output, but verification failed and execution stopped."
+            )
+            self._structured_log(
+                "PIPELINE_COMPLETE",
+                {"success": False, **self.get_completion_snapshot()},
+            )
             return False
+        except Exception as exc:
+            active_stage = self.state or "UNKNOWN"
+            self._mark_stage(active_stage, "failed", f"{type(exc).__name__}: {exc}")
+            self.completion_status = "blocked"
+            self.completion_summary = (
+                f"Pipeline blocked in stage '{active_stage}' due to {type(exc).__name__}: {exc}"
+            )
+            self._structured_log(
+                "PIPELINE_COMPLETE",
+                {"success": False, **self.get_completion_snapshot()},
+            )
+            raise
         finally:
             httpx_logger.removeHandler(httpx_handler)
 
@@ -252,36 +407,11 @@ class OrchestrationStateMachine:
         """
         output = str(results.get("final_output", ""))
 
-        banned_patterns = [
-            (r"(?im)^\s*(#|//)\s*TODO\b", "TODO comment marker"),
-            (r"(?im)^\s*TODO\b", "TODO marker"),
-            (r"(?im)\bTBD\b", "TBD marker"),
-            (r"(?im)\bFIXME\b", "FIXME marker"),
-            (r"(?im)\braise\s+NotImplementedError\b", "NotImplementedError stub"),
-            (r"(?im)^\s*pass\s*(#.*)?$", "pass-only implementation"),
-            (r"(?im)<\s*placeholder\s*>", "<placeholder> token"),
-            (r"(?im)\{\{\s*.*placeholder.*\}\}", "{{placeholder}} token"),
-        ]
+        agent = VerificationAgent()
+        report = agent.evaluate(output)
+        if report.success:
+            return True
 
-        for pattern, marker_name in banned_patterns:
-            if re.search(pattern, output):
-                logger.error(
-                    f"Verification failed: detected banned lexical marker '{marker_name}'."
-                )
-                return False
-
-        # Dynamic AST Analysis for Python code blocks
-        python_blocks = re.findall(r"```python\n(.*?)\n```", output, re.DOTALL)
-        for code in python_blocks:
-            try:
-                parsed = ast.parse(code)
-                for node in ast.walk(parsed):
-                    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                        if len(node.body) == 1 and isinstance(node.body[0], ast.Pass):
-                            logger.error("Verification failed: AST detected empty implementation (pass).")
-                            return False
-            except SyntaxError as e:
-                logger.error(f"Verification failed: AST SyntaxError in generated code - {e}")
-                return False
-
-        return True
+        for message in report.errors:
+            logger.error(message)
+        return False

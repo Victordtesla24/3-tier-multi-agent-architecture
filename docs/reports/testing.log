@@ -1,33 +1,355 @@
-source /Users/Shared/antigravity/3-tier-multi-agent-architecture-work/.venv/bin/activate
-vics-macbook-pro@MacBook-Pro 3-tier-multi-agent-architecture-work % source /Users/Shared/antigravity/3-tier-multi-agent-
-architecture-work/.venv/bin/activate
-(antigravity-3tier-crewai) vics-macbook-pro@MacBook-Pro 3-tier-multi-agent-architecture-work % clear
-(antigravity-3tier-crewai) vics-macbook-pro@MacBook-Pro 3-tier-multi-agent-architecture-work % make run-cli
+(antigravity-3tier-crewai) vics-macbook-pro@MacBook-Pro 3-tier-multi-agent-architecture-work % cd ..
+(antigravity-3tier-crewai) vics-macbook-pro@MacBook-Pro antigravity % cd testing_folder 
+(antigravity-3tier-crewai) vics-macbook-pro@MacBook-Pro testing_folder % ls -la
+total 0
+drwxr-xr-x  2 vics-macbook-pro  wheel   64 Mar  5 00:47 .
+drwxr-xr-x  8 vics-macbook-pro  wheel  256 Mar  5 00:48 ..
+(antigravity-3tier-crewai) vics-macbook-pro@MacBook-Pro testing_folder % clear
+(antigravity-3tier-crewai) vics-macbook-pro@MacBook-Pro testing_folder % git clone https://github.com/Victordtesla24/3-tier-multi-agent-architecture.git
+
+Cloning into '3-tier-multi-agent-architecture'...
+remote: Enumerating objects: 373, done.
+remote: Counting objects: 100% (373/373), done.
+remote: Compressing objects: 100% (239/239), done.
+remote: Total 373 (delta 166), reused 290 (delta 92), pack-reused 0 (from 0)
+Receiving objects: 100% (373/373), 743.52 KiB | 6.58 MiB/s, done.
+Resolving deltas: 100% (166/166), done.
+(antigravity-3tier-crewai) vics-macbook-pro@MacBook-Pro testing_folder % cd 3-tier-multi-agent-architecture 
+(antigravity-3tier-crewai) vics-macbook-pro@MacBook-Pro 3-tier-multi-agent-architecture % uv sync --all-extras --python 3.12
+warning: `VIRTUAL_ENV=/Users/Shared/antigravity/3-tier-multi-agent-architecture-work/.venv` does not match the project environment path `.venv` and will be ignored; use `--active` to target the active environment instead
+Using CPython 3.12.12
+Creating virtual environment at: .venv
+Resolved 276 packages in 6ms
+Prepared 1 package in 535ms
+Installed 273 packages in 828ms
+ + aiohappyeyeballs==2.6.1
+ + aiohttp==3.13.3
+ + aiosignal==1.4.0
+ + annotated-doc==0.0.4
+ + annotated-types==0.7.0
+ + anthropic==0.84.0
+ + anyio==4.12.1
+ + appdirs==1.4.4
+ + appnope==0.1.4
+ + argcomplete==3.6.3
+ + argon2-cffi==25.1.0
+ + argon2-cffi-bindings==25.1.0
+ + arrow==1.4.0
+ + asttokens==3.0.1
+ + async-lru==2.2.0
+ + attrs==25.4.0
+ + auth0-python==5.1.0
+ + babel==2.18.0
+ + backoff==2.2.1
+ + bcrypt==5.0.0
+ + beautifulsoup4==4.13.5
+ + black==26.1.0
+ + bleach==6.3.0
+ + blinker==1.9.0
+ + boto3==1.42.59
+ + botocore==1.42.59
+ + build==1.4.0
+ + cachetools==7.0.1
+ + certifi==2026.2.25
+ + cffi==2.0.0
+ + cfgv==3.5.0
+ + charset-normalizer==3.4.4
+ + chromadb==1.1.1
+ + click==8.1.8
+ + cohere==5.20.7
+ + colorama==0.4.6
+ + comm==0.2.3
+ + crewai==0.95.0
+ + crewai-tools==0.75.0
+ + cryptography==46.0.5
+ + debugpy==1.8.20
+ + decorator==5.2.1
+ + defusedxml==0.7.1
+ + deprecation==2.1.0
+ + diskcache==5.6.3
+ + distlib==0.4.0
+ + distro==1.9.0
+ + docker==7.1.0
+ + docstring-parser==0.17.0
+ + durationpy==0.10
+ + et-xmlfile==2.0.0
+ + eval-type-backport==0.3.1
+ + executing==2.2.1
+ + fastavro==1.12.1
+ + fastjsonschema==2.21.2
+ + filelock==3.24.3
+ + flatbuffers==25.12.19
+ + fqdn==1.5.1
+ + frozenlist==1.8.0
+ + fsspec==2026.2.0
+ + google-auth==2.48.0
+ + google-genai==1.65.0
+ + googleapis-common-protos==1.72.0
+ + griffe==2.0.0
+ + griffecli==2.0.0
+ + griffelib==2.0.0
+ + groq==1.0.0
+ + grpcio==1.78.0
+ + h11==0.16.0
+ + hf-xet==1.3.2
+ + httpcore==1.0.9
+ + httptools==0.7.1
+ + httpx==0.28.1
+ + httpx-sse==0.4.3
+ + huggingface-hub==0.36.2
+ + identify==2.6.16
+ + idna==3.11
+ + importlib-metadata==8.7.1
+ + importlib-resources==6.5.2
+ + iniconfig==2.3.0
+ + instructor==1.12.0
+ + invoke==2.2.1
+ + ipykernel==7.2.0
+ + ipython==9.10.0
+ + ipython-pygments-lexers==1.1.1
+ + ipywidgets==8.1.8
+ + isoduration==20.11.0
+ + jedi==0.19.2
+ + jinja2==3.1.6
+ + jiter==0.10.0
+ + jmespath==1.1.0
+ + json-repair==0.25.3
+ + json5==0.10.0
+ + jsonpatch==1.33
+ + jsonpickle==4.1.1
+ + jsonpointer==3.0.0
+ + jsonref==1.1.0
+ + jsonschema==4.26.0
+ + jsonschema-specifications==2025.9.1
+ + jupyter==1.1.1
+ + jupyter-client==8.8.0
+ + jupyter-console==6.6.3
+ + jupyter-core==5.9.1
+ + jupyter-events==0.12.0
+ + jupyter-lsp==2.3.0
+ + jupyter-server==2.17.0
+ + jupyter-server-terminals==0.5.4
+ + jupyterlab==4.5.5
+ + jupyterlab-pygments==0.3.0
+ + jupyterlab-server==2.28.0
+ + jupyterlab-widgets==3.0.16
+ + kubernetes==35.0.0
+ + lancedb==0.5.7
+ + langchain-core==0.3.83
+ + langchain-openai==0.3.23
+ + langgraph==1.0.1
+ + langgraph-checkpoint==3.0.1
+ + langgraph-prebuilt==1.0.1
+ + langgraph-sdk==0.2.15
+ + langsmith==0.7.9
+ + lark==1.3.1
+ + librt==0.8.1
+ + litellm==1.73.7
+ + logfire-api==4.25.0
+ + lxml==6.0.2
+ + markdown-it-py==4.0.0
+ + markupsafe==3.0.3
+ + matplotlib-inline==0.2.1
+ + mcp==1.23.3
+ + mdurl==0.1.2
+ + mistralai==1.9.11
+ + mistune==3.2.0
+ + mmh3==5.2.0
+ + mpmath==1.3.0
+ + multidict==6.7.1
+ + mypy==1.19.1
+ + mypy-extensions==1.1.0
+ + nbclient==0.10.4
+ + nbconvert==7.17.0
+ + nbformat==5.10.4
+ + nest-asyncio==1.6.0
+ + networkx==3.6.1
+ + nodeenv==1.10.0
+ + notebook==7.5.4
+ + notebook-shim==0.2.4
+ + numpy==2.4.2
+ + oauthlib==3.3.1
+ + onnxruntime==1.24.2
+ + openai==1.83.0
+ + openpyxl==3.1.5
+ + opentelemetry-api==1.34.1
+ + opentelemetry-exporter-otlp-proto-common==1.34.1
+ + opentelemetry-exporter-otlp-proto-grpc==1.34.1
+ + opentelemetry-exporter-otlp-proto-http==1.34.1
+ + opentelemetry-proto==1.34.1
+ + opentelemetry-sdk==1.34.1
+ + opentelemetry-semantic-conventions==0.55b1
+ + orjson==3.11.7
+ + ormsgpack==1.12.2
+ + overrides==7.7.0
+ + packaging==25.0
+ + pandocfilters==1.5.1
+ + parso==0.8.6
+ + pathspec==1.0.4
+ + pdfminer-six==20251230
+ + pdfplumber==0.11.9
+ + pexpect==4.9.0
+ + pillow==12.1.1
+ + platformdirs==4.9.2
+ + pluggy==1.6.0
+ + posthog==5.4.0
+ + pre-commit==4.5.1
+ + prometheus-client==0.24.1
+ + prompt-toolkit==3.0.52
+ + propcache==0.4.1
+ + protobuf==5.29.6
+ + psutil==7.2.2
+ + ptyprocess==0.7.0
+ + pure-eval==0.2.3
+ + py==1.11.0
+ + pyarrow==23.0.1
+ + pyasn1==0.6.2
+ + pyasn1-modules==0.4.2
+ + pybase64==1.4.3
+ + pycparser==3.0
+ + pydantic==2.11.10
+ + pydantic-ai==0.4.3
+ + pydantic-ai-slim==0.4.3
+ + pydantic-core==2.33.2
+ + pydantic-evals==0.4.3
+ + pydantic-graph==0.4.3
+ + pydantic-settings==2.10.1
+ + pygments==2.19.2
+ + pyjwt==2.11.0
+ + pylance==0.9.18
+ + pypdf==6.7.5
+ + pypdfium2==5.5.0
+ + pypika==0.51.1
+ + pyproject-hooks==1.2.0
+ + pytest==9.0.2
+ + python-dateutil==2.9.0.post0
+ + python-discovery==1.1.0
+ + python-docx==1.2.0
+ + python-dotenv==1.1.1
+ + python-json-logger==4.0.0
+ + python-multipart==0.0.22
+ + pytokens==0.4.1
+ + pytube==15.0.0
+ + pyvis==0.3.2
+ + pyyaml==6.0.3
+ + pyzmq==27.1.0
+ + ratelimiter==1.2.0.post0
+ + referencing==0.37.0
+ + regex==2024.9.11
+ + requests==2.32.5
+ + requests-oauthlib==2.0.0
+ + requests-toolbelt==1.0.0
+ + retry==0.9.2
+ + rfc3339-validator==0.1.4
+ + rfc3986-validator==0.1.1
+ + rfc3987-syntax==1.1.0
+ + rich==14.3.3
+ + rpds-py==0.30.0
+ + rsa==4.9.1
+ + ruamel-yaml==0.19.1
+ + ruff==0.15.4
+ + s3transfer==0.16.0
+ + semver==3.0.4
+ + send2trash==2.1.0
+ + setuptools==82.0.0
+ + shellingham==1.5.4
+ + six==1.17.0
+ + sniffio==1.3.1
+ + soupsieve==2.8.3
+ + sse-starlette==3.3.2
+ + stack-data==0.6.3
+ + stagehand==3.6.0
+ + starlette==0.52.1
+ + sympy==1.14.0
+ + tenacity==9.1.4
+ + terminado==0.18.1
+ + tiktoken==0.12.0
+ + tinycss2==1.4.0
+ + tokenizers==0.22.2
+ + tomli==2.0.2
+ + tomli-w==1.1.0
+ + tornado==6.5.4
+ + tqdm==4.67.3
+ + traitlets==5.14.3
+ + typer==0.23.1
+ + types-requests==2.32.4.20260107
+ + typing-extensions==4.15.0
+ + typing-inspection==0.4.2
+ + tzdata==2025.3
+ + uri-template==1.3.0
+ + urllib3==2.6.3
+ + uuid-utils==0.14.1
+ + uv==0.9.30
+ + uvicorn==0.41.0
+ + uvloop==0.22.1
+ + virtualenv==21.1.0
+ + watchfiles==1.1.1
+ + wcwidth==0.6.0
+ + webcolors==25.10.0
+ + webencodings==0.5.1
+ + websocket-client==1.9.0
+ + websockets==16.0
+ + widgetsnbextension==4.0.15
+ + xxhash==3.6.0
+ + yarl==1.22.0
+ + youtube-transcript-api==1.2.4
+ + zipp==3.23.0
+ + zstandard==0.25.0
+(antigravity-3tier-crewai) vics-macbook-pro@MacBook-Pro 3-tier-multi-agent-architecture % chmod +x scripts/integrate_crewai.sh
+
+(antigravity-3tier-crewai) vics-macbook-pro@MacBook-Pro 3-tier-multi-agent-architecture % ./scripts/integrate_crewai.sh 
+🌌 Antigravity 3-Tier Architecture - CrewAI Integration
+=======================================================
+📦 Installing dependencies...
+Resolved 276 packages in 15ms
+Prepared 1 package in 205ms
+Uninstalled 1 package in 35ms
+Installed 1 package in 5ms
+ - crewai-tools==0.76.0
+ + crewai-tools==0.75.0
+🔑 Verifying API keys...
+🧪 Validating toolchain compatibility...
+crewai_tools import check failed: ImportError: cannot import name 'EnvVar' from 'crewai.tools' (/tmp/.venv-antigravity/lib/python3.12/site-packages/crewai/tools/__init__.py)
+⚠️  WARNING: crewai_tools import failed. Local workspace tool fallback will be used at runtime.
+📁 Verifying integration directories...
+✅ Verifying .agent structure...
+
+✅ CrewAI integration complete!
+
+Next steps:
+1. Review src/engine/llm_config.py for provider policy + validation
+2. Review src/engine/crew_orchestrator.py for telemetry and tool fallback logic
+3. Review src/engine/state_machine.py for retry and reliability gates
+4. Test with: make run-cli
+
+🚀 System ready for execution!
+(antigravity-3tier-crewai) vics-macbook-pro@MacBook-Pro 3-tier-multi-agent-architecture % make run-cli
 PYTHONPATH=src /tmp/.venv-antigravity/bin/python src/orchestrator/antigravity-cli.py \
-                --prompt "test" --workspace /tmp/antigravity_workspace
+                --prompt "test" --workspace /tmp/antigravity_workspace \
+                --strict-provider-validation --max-provider-4xx 50
 3-tier-multi-agent-architecture Status: ON 🟢
 3-tier-multi-agent-architecture Status: ON 🟢
 🌌 Antigravity 3-Tier Multi-Agent Architecture + CrewAI
 📁 Workspace : /private/tmp/antigravity_workspace
-📁 Project   : /Users/Shared/antigravity/3-tier-multi-agent-architecture-work
+📁 Project   : /Users/Shared/antigravity/testing_folder/3-tier-multi-agent-architecture
 🎯 Objective : test
 
-2026-03-05 00:12:33,896 - AntigravityCLI - INFO - Initialising Antigravity Engine | workspace=/private/tmp/antigravity_workspace
-2026-03-05 00:12:33,896 - AntigravityCLI - INFO - Engaging Semantic Healer pre-flight checks…
-2026-03-05 00:12:33,896 - SemanticHealer - INFO - Validating semantic integrity: .agent/rules/l1-orchestration.md (sha256:3d70a167c4cc)
-2026-03-05 00:12:33,897 - SemanticHealer - INFO - Semantic validation passed: .agent/rules/l1-orchestration.md
-2026-03-05 00:12:33,897 - SemanticHealer - INFO - Validating semantic integrity: .agent/rules/l2-sub-agent.md (sha256:7f43cfcb3175)
-2026-03-05 00:12:33,897 - SemanticHealer - INFO - Semantic validation passed: .agent/rules/l2-sub-agent.md
-2026-03-05 00:12:33,898 - SemanticHealer - INFO - Validating semantic integrity: .agent/rules/l3-leaf-worker.md (sha256:5be27b52bd5d)
-2026-03-05 00:12:33,898 - SemanticHealer - INFO - Semantic validation passed: .agent/rules/l3-leaf-worker.md
-2026-03-05 00:12:33,898 - SemanticHealer - INFO - Validating semantic integrity: .agent/rules/system-verification-agent.md (sha256:f975a0fd0fec)
-2026-03-05 00:12:33,898 - SemanticHealer - INFO - Semantic validation passed: .agent/rules/system-verification-agent.md
-2026-03-05 00:12:33,898 - AntigravityCLI - INFO - Starting execution pipeline…
-2026-03-05 00:12:33,898 - AntigravityEngine - INFO - Transitioning to state: PROMPT_RECONSTRUCTION
-2026-03-05 00:12:33,921 - chromadb.telemetry.product.posthog - INFO - Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
-2026-03-05 00:12:33,992 - chromadb.telemetry.product.posthog - INFO - Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
-2026-03-05 00:12:34,441 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
-2026-03-05 00:12:34,715 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-03-05 00:50:16,730 - AntigravityCLI - INFO - Initialising Antigravity Engine | workspace=/private/tmp/antigravity_workspace
+2026-03-05 00:50:16,731 - AntigravityCLI - INFO - Engaging Semantic Healer pre-flight checks…
+2026-03-05 00:50:16,731 - SemanticHealer - INFO - Validating semantic integrity: .agent/rules/l1-orchestration.md (sha256:3d70a167c4cc)
+2026-03-05 00:50:16,732 - SemanticHealer - INFO - Semantic validation passed: .agent/rules/l1-orchestration.md
+2026-03-05 00:50:16,732 - SemanticHealer - INFO - Validating semantic integrity: .agent/rules/l2-sub-agent.md (sha256:7f43cfcb3175)
+2026-03-05 00:50:16,732 - SemanticHealer - INFO - Semantic validation passed: .agent/rules/l2-sub-agent.md
+2026-03-05 00:50:16,733 - SemanticHealer - INFO - Validating semantic integrity: .agent/rules/l3-leaf-worker.md (sha256:5be27b52bd5d)
+2026-03-05 00:50:16,733 - SemanticHealer - INFO - Semantic validation passed: .agent/rules/l3-leaf-worker.md
+2026-03-05 00:50:16,733 - SemanticHealer - INFO - Validating semantic integrity: .agent/rules/system-verification-agent.md (sha256:f975a0fd0fec)
+2026-03-05 00:50:16,733 - SemanticHealer - INFO - Semantic validation passed: .agent/rules/system-verification-agent.md
+2026-03-05 00:50:16,734 - AntigravityCLI - INFO - Starting execution pipeline…
+2026-03-05 00:50:16,734 - AntigravityEngine - INFO - Transitioning to state: PROMPT_RECONSTRUCTION
+2026-03-05 00:50:16,763 - chromadb.telemetry.product.posthog - INFO - Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+2026-03-05 00:50:16,837 - chromadb.telemetry.product.posthog - INFO - Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+2026-03-05 00:50:18,204 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-03-05 00:50:18,542 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
 # Agent: Prompt Reconstruction Protocol Agent
 ## Task: # AI Prompt Enhancer v2.0
 Role: Elite Prompt Engineer & Systems Architect
@@ -73,327 +395,478 @@ Input Data
 <input_data> 
 test 
 </input_data>
-00:12:34 - LiteLLM:INFO: utils.py:3225 - 
+00:50:18 - LiteLLM:INFO: utils.py:3225 - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:34,744 - LiteLLM - INFO - 
+2026-03-05 00:50:18,592 - LiteLLM - INFO - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:41,677 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
-00:12:41 - LiteLLM:INFO: utils.py:1236 - Wrapper: Completed Call, calling success_handler
-2026-03-05 00:12:41,679 - LiteLLM - INFO - Wrapper: Completed Call, calling success_handler
-00:12:41 - LiteLLM:INFO: utils.py:1236 - Wrapper: Completed Call, calling success_handler
-2026-03-05 00:12:41,682 - LiteLLM - INFO - Wrapper: Completed Call, calling success_handler
+2026-03-05 00:50:25,560 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+00:50:25 - LiteLLM:INFO: utils.py:1236 - Wrapper: Completed Call, calling success_handler
+2026-03-05 00:50:25,583 - LiteLLM - INFO - Wrapper: Completed Call, calling success_handler
+00:50:25 - LiteLLM:INFO: utils.py:1236 - Wrapper: Completed Call, calling success_handler
+2026-03-05 00:50:25,586 - LiteLLM - INFO - Wrapper: Completed Call, calling success_handler
 
 
 # Agent: Prompt Reconstruction Protocol Agent
 ## Final Answer: 
 ```markdown
-# System Prompt — Deterministic Test Handler
+# System Prompt — Production-Grade Reconstruction
 
 ## Role
-You are a **Deterministic Test Handler**.
+You are an **Elite Prompt Engineer & Systems Architect**.
 
 ## Objective
-Process the input **"test"** with maximum execution fidelity and produce a single definitive output.
+Reconstruct the provided `<input_data>` into a highly optimized, production-grade system prompt with **1:1 requirement coverage**.
 
-## Input
-- Accept the exact input string: **"test"**.
+## Input Data
+- `<input_data>` content: **test**
 
-## Process
-- Validate that the input matches **"test"**.
-- Execute the response pathway for the validated input.
+## Operational Constraints
+1. **Deterministic Phrasing & Decision Enforcement**
+   - Use **affirmative, active-voice directives** only.
+   - Eliminate optionality; select **one best approach**.
+   - If a missing requirement blocks success, **trigger Clarification Protocol**.
 
-## Output
-- Return the exact string: **"test"**.
+2. **Critical Clarification Protocol (Smart Gating)**
+   - Do not assume primary requirements or success criteria.
+   - Do not ask about minor details or standard specifics.
+   - **HALT** only if a blocking ambiguity prevents execution.
+
+3. **Token Efficiency vs. Content Density**
+   - Remove filler while preserving functional density.
+
+4. **Output Isolation**
+   - Output **only** the rewritten prompt in a **Markdown code block**.
+
+5. **Exhaustive Execution & Integrity**
+   - Map every requirement to an actionable instruction.
+   - Preserve nested logic and hierarchy.
+   - Avoid summarization or truncation.
+
+## Core Instructions
+
+### 1) Verification Gateway (Pre-Flight Decomposition)
+- **Index** all unique requirements, constraints, and success criteria.
+- **Validate** 100% coverage in the output.
+- If any requirement is missing, **re-process** until complete.
+
+### 2) Structural Refinement
+- Deconstruct any complex input into sequential, actionable steps.
+- Use advanced Markdown with headers and nested lists.
+- Enforce linear flow: **Input → Process → Output**.
+- Preserve all logic and dependencies.
+
+### 3) Technical Standards (Code/Scripting)
+- If code is required, produce **production-grade, publication-ready** output.
+- Use concrete implementations; no generic abstractions.
+- No placeholders, dummy calls, or simulated outputs.
+- Ensure completeness and cross-check against success criteria.
+
+## Execution Flow
+
+### Input
+- Accept the literal string: **"test"**.
+
+### Process
+- Preserve the input exactly, with no modification or interpretation.
+
+### Output
+- Emit the exact string: **test**.
 
 ## Completion Criteria
-- Output only the specified string.
-- Provide no additional text, metadata, or formatting.
+- Output only the exact string **test** with no additional text or formatting.
 ```
 
 
-2026-03-05 00:12:41,910 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
-00:12:43 - LiteLLM:INFO: utils.py:3225 - 
+2026-03-05 00:50:26,781 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+00:50:28 - LiteLLM:INFO: utils.py:3225 - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:43,195 - LiteLLM - INFO - 
+2026-03-05 00:50:28,074 - LiteLLM - INFO - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:43,459 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
+2026-03-05 00:50:28,370 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
 
 Give Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new
 LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
 
-00:12:43 - LiteLLM:INFO: utils.py:3225 - 
+00:50:28 - LiteLLM:INFO: utils.py:3225 - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:43,482 - LiteLLM - INFO - 
+2026-03-05 00:50:28,393 - LiteLLM - INFO - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:43,728 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
+2026-03-05 00:50:28,725 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
 
 Give Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new
 LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
 
-00:12:43 - LiteLLM:INFO: utils.py:3225 - 
+00:50:28 - LiteLLM:INFO: utils.py:3225 - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:43,741 - LiteLLM - INFO - 
+2026-03-05 00:50:28,739 - LiteLLM - INFO - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:44,024 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
+2026-03-05 00:50:29,032 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
 
 Give Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new
 LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
 
-00:12:44 - LiteLLM:INFO: utils.py:3225 - 
+00:50:29 - LiteLLM:INFO: utils.py:3225 - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:44,038 - LiteLLM - INFO - 
+2026-03-05 00:50:29,049 - LiteLLM - INFO - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:44,328 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
+2026-03-05 00:50:29,844 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
 
 Give Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new
 LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
 
-00:12:44 - LiteLLM:INFO: utils.py:3225 - 
+00:50:29 - LiteLLM:INFO: utils.py:3225 - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:44,352 - LiteLLM - INFO - 
+2026-03-05 00:50:29,871 - LiteLLM - INFO - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:44,714 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
+2026-03-05 00:50:30,135 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
 
 Give Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new
 LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
 
-00:12:44 - LiteLLM:INFO: utils.py:3225 - 
+00:50:30 - LiteLLM:INFO: utils.py:3225 - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:44,739 - LiteLLM - INFO - 
+2026-03-05 00:50:30,160 - LiteLLM - INFO - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:44,972 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
+2026-03-05 00:50:30,405 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
 
 Give Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new
 LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
 
-00:12:44 - LiteLLM:INFO: utils.py:3225 - 
+00:50:30 - LiteLLM:INFO: utils.py:3225 - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:44,998 - LiteLLM - INFO - 
+2026-03-05 00:50:30,431 - LiteLLM - INFO - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:45,250 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
+2026-03-05 00:50:30,665 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
 
 Give Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new
 LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
 
-00:12:45 - LiteLLM:INFO: utils.py:3225 - 
+00:50:30 - LiteLLM:INFO: utils.py:3225 - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:45,285 - LiteLLM - INFO - 
+2026-03-05 00:50:30,703 - LiteLLM - INFO - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:45,562 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
+2026-03-05 00:50:30,941 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
 
 Give Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new
 LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
 
-00:12:45 - LiteLLM:INFO: utils.py:3225 - 
+00:50:30 - LiteLLM:INFO: utils.py:3225 - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:45,596 - LiteLLM - INFO - 
+2026-03-05 00:50:30,976 - LiteLLM - INFO - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:45,944 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
+2026-03-05 00:50:32,308 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
 
 Give Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new
 LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
 
-2026-03-05 00:12:45,983 - AntigravityEngine - INFO - Transitioning to state: RESEARCH
-2026-03-05 00:12:45,985 - opentelemetry.trace - WARNING - Overriding of current TracerProvider is not allowed
-2026-03-05 00:12:45,992 - chromadb.telemetry.product.posthog - INFO - Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
-2026-03-05 00:12:46,003 - chromadb.telemetry.product.posthog - INFO - Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
-2026-03-05 00:12:46,262 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
-2026-03-05 00:12:46,490 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-03-05 00:50:32,349 - AntigravityEngine - INFO - Transitioning to state: RESEARCH
+2026-03-05 00:50:32,362 - chromadb.telemetry.product.posthog - INFO - Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+2026-03-05 00:50:32,373 - chromadb.telemetry.product.posthog - INFO - Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+2026-03-05 00:50:32,628 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-03-05 00:50:32,909 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
 # Agent: Internet Research Agent
 ## Task: Perform technical research strictly from official / primary documentation sources.
 
 INPUT (Reconstructed Prompt):
 ```markdown
-# System Prompt — Deterministic Test Handler
+# System Prompt — Production-Grade Reconstruction
 
 ## Role
-You are a **Deterministic Test Handler**.
+You are an **Elite Prompt Engineer & Systems Architect**.
 
 ## Objective
-Process the input **"test"** with maximum execution fidelity and produce a single definitive output.
+Reconstruct the provided `<input_data>` into a highly optimized, production-grade system prompt with **1:1 requirement coverage**.
 
-## Input
-- Accept the exact input string: **"test"**.
+## Input Data
+- `<input_data>` content: **test**
 
-## Process
-- Validate that the input matches **"test"**.
-- Execute the response pathway for the validated input.
+## Operational Constraints
+1. **Deterministic Phrasing & Decision Enforcement**
+   - Use **affirmative, active-voice directives** only.
+   - Eliminate optionality; select **one best approach**.
+   - If a missing requirement blocks success, **trigger Clarification Protocol**.
 
-## Output
-- Return the exact string: **"test"**.
+2. **Critical Clarification Protocol (Smart Gating)**
+   - Do not assume primary requirements or success criteria.
+   - Do not ask about minor details or standard specifics.
+   - **HALT** only if a blocking ambiguity prevents execution.
+
+3. **Token Efficiency vs. Content Density**
+   - Remove filler while preserving functional density.
+
+4. **Output Isolation**
+   - Output **only** the rewritten prompt in a **Markdown code block**.
+
+5. **Exhaustive Execution & Integrity**
+   - Map every requirement to an actionable instruction.
+   - Preserve nested logic and hierarchy.
+   - Avoid summarization or truncation.
+
+## Core Instructions
+
+### 1) Verification Gateway (Pre-Flight Decomposition)
+- **Index** all unique requirements, constraints, and success criteria.
+- **Validate** 100% coverage in the output.
+- If any requirement is missing, **re-process** until complete.
+
+### 2) Structural Refinement
+- Deconstruct any complex input into sequential, actionable steps.
+- Use advanced Markdown with headers and nested lists.
+- Enforce linear flow: **Input → Process → Output**.
+- Preserve all logic and dependencies.
+
+### 3) Technical Standards (Code/Scripting)
+- If code is required, produce **production-grade, publication-ready** output.
+- Use concrete implementations; no generic abstractions.
+- No placeholders, dummy calls, or simulated outputs.
+- Ensure completeness and cross-check against success criteria.
+
+## Execution Flow
+
+### Input
+- Accept the literal string: **"test"**.
+
+### Process
+- Preserve the input exactly, with no modification or interpretation.
+
+### Output
+- Emit the exact string: **test**.
 
 ## Completion Criteria
-- Output only the specified string.
-- Provide no additional text, metadata, or formatting.
+- Output only the exact string **test** with no additional text or formatting.
 ```
 
 OUTPUT REQUIREMENTS:
+- Return markdown using this exact schema:
+  - ## Summary
+  - ## Citations[]
+  - ## MissingConfig[]
+  - ## RiskNotes[]
 - Provide constraints, API limits, model configuration facts, and integration gotchas.
-- Prefer official documentation and vendor API references.
-- Be explicit about any missing configuration that blocks execution.
+- Cite official documentation URLs in Citations[] whenever external facts are referenced.
+- Be explicit about missing configuration that blocks execution.
 
-00:12:46 - LiteLLM:INFO: utils.py:3225 - 
+00:50:32 - LiteLLM:INFO: utils.py:3225 - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:46,519 - LiteLLM - INFO - 
+2026-03-05 00:50:32,937 - LiteLLM - INFO - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:49,734 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
-00:12:49 - LiteLLM:INFO: utils.py:1236 - Wrapper: Completed Call, calling success_handler
-2026-03-05 00:12:49,739 - LiteLLM - INFO - Wrapper: Completed Call, calling success_handler
-00:12:49 - LiteLLM:INFO: utils.py:1236 - Wrapper: Completed Call, calling success_handler
-2026-03-05 00:12:49,741 - LiteLLM - INFO - Wrapper: Completed Call, calling success_handler
+2026-03-05 00:50:41,832 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+00:50:41 - LiteLLM:INFO: utils.py:1236 - Wrapper: Completed Call, calling success_handler
+2026-03-05 00:50:41,834 - LiteLLM - INFO - Wrapper: Completed Call, calling success_handler
+00:50:41 - LiteLLM:INFO: utils.py:1236 - Wrapper: Completed Call, calling success_handler
+2026-03-05 00:50:41,835 - LiteLLM - INFO - Wrapper: Completed Call, calling success_handler
 
 
 # Agent: Internet Research Agent
 ## Final Answer: 
-No official or primary documentation sources were accessed in this session. I cannot provide verified constraints, API limits, model configuration facts, or integration gotchas from official sources. Missing configuration: there is no authoritative documentation cited for the deterministic prompt processor’s runtime/host environment, input validation mechanism, or output handling; therefore execution requirements and limits cannot be validated against any vendor or platform specification.
+## Summary
+No official or primary documentation for the target runtime/platform of this deterministic prompt executor was provided, so I cannot verify concrete constraints, API limits, model configuration facts, or integration gotchas for the actual execution environment. Official platform documentation is required to validate operational limits and configuration behaviors (e.g., request/response schemas and rate limits are platform-defined and must be sourced from the vendor’s primary docs).
+
+## Citations[]
+- https://platform.openai.com/docs/api-reference
+- https://platform.openai.com/docs/guides/rate-limits
+
+## MissingConfig[]
+- Official documentation URLs for the exact runtime/platform that executes this prompt (to verify execution constraints, input/output handling, and integration gotchas).
+- Vendor identification for the execution environment (to bind requirements to a specific primary documentation set).
+- Official API/SDK references for any model/runtime used (to validate configuration parameters, limits, and behaviors).
+
+## RiskNotes[]
+- Without authoritative platform documentation, any stated limits or constraints would be speculative and may be incorrect.
+- Integration gotchas (e.g., input/output normalization, max payload size, or rate limiting) are platform-specific and cannot be validated without official sources.
 
 
-2026-03-05 00:12:49,874 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
-00:12:49 - LiteLLM:INFO: utils.py:3225 - 
+2026-03-05 00:50:42,124 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+00:50:42 - LiteLLM:INFO: utils.py:3225 - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:49,897 - LiteLLM - INFO - 
+2026-03-05 00:50:42,159 - LiteLLM - INFO - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:50,145 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
+2026-03-05 00:50:42,397 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
 
 Give Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new
 LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
 
-00:12:50 - LiteLLM:INFO: utils.py:3225 - 
+00:50:42 - LiteLLM:INFO: utils.py:3225 - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:50,156 - LiteLLM - INFO - 
+2026-03-05 00:50:42,413 - LiteLLM - INFO - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:51,140 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
+2026-03-05 00:50:42,666 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
 
 Give Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new
 LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
 
-00:12:51 - LiteLLM:INFO: utils.py:3225 - 
+00:50:42 - LiteLLM:INFO: utils.py:3225 - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:51,151 - LiteLLM - INFO - 
+2026-03-05 00:50:42,682 - LiteLLM - INFO - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:52,702 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
+2026-03-05 00:50:43,163 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
 
 Give Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new
 LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
 
-00:12:52 - LiteLLM:INFO: utils.py:3225 - 
+00:50:43 - LiteLLM:INFO: utils.py:3225 - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:52,720 - LiteLLM - INFO - 
+2026-03-05 00:50:43,180 - LiteLLM - INFO - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:53,749 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
+2026-03-05 00:50:43,416 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
 
 Give Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new
 LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
 
-00:12:53 - LiteLLM:INFO: utils.py:3225 - 
+00:50:43 - LiteLLM:INFO: utils.py:3225 - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:53,776 - LiteLLM - INFO - 
+2026-03-05 00:50:43,444 - LiteLLM - INFO - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:54,019 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
+2026-03-05 00:50:43,721 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
 
 Give Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new
 LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
 
-00:12:54 - LiteLLM:INFO: utils.py:3225 - 
+00:50:43 - LiteLLM:INFO: utils.py:3225 - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:54,043 - LiteLLM - INFO - 
+2026-03-05 00:50:43,749 - LiteLLM - INFO - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:55,467 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
+2026-03-05 00:50:44,391 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
 
 Give Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new
 LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
 
-00:12:55 - LiteLLM:INFO: utils.py:3225 - 
+00:50:44 - LiteLLM:INFO: utils.py:3225 - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:55,491 - LiteLLM - INFO - 
+2026-03-05 00:50:44,417 - LiteLLM - INFO - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:55,775 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
+2026-03-05 00:50:44,699 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
 
 Give Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new
 LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
 
-00:12:55 - LiteLLM:INFO: utils.py:3225 - 
+00:50:44 - LiteLLM:INFO: utils.py:3225 - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:55,808 - LiteLLM - INFO - 
+2026-03-05 00:50:44,732 - LiteLLM - INFO - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:56,040 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
+2026-03-05 00:50:45,109 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
 
 Give Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new
 LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
 
-00:12:56 - LiteLLM:INFO: utils.py:3225 - 
+00:50:45 - LiteLLM:INFO: utils.py:3225 - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:56,073 - LiteLLM - INFO - 
+2026-03-05 00:50:45,143 - LiteLLM - INFO - 
 LiteLLM completion() model= gpt-5.2-codex; provider = openai
-2026-03-05 00:12:56,292 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
+2026-03-05 00:50:45,723 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 400 Bad Request"
 
 Give Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new
 LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
 
-2026-03-05 00:12:56,326 - AntigravityEngine - INFO - Transitioning to state: ORCHESTRATION_L1
-2026-03-05 00:12:56,357 - opentelemetry.trace - WARNING - Overriding of current TracerProvider is not allowed
-2026-03-05 00:12:56,364 - chromadb.telemetry.product.posthog - INFO - Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
-2026-03-05 00:12:56,376 - chromadb.telemetry.product.posthog - INFO - Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
- 
-[2026-03-05 00:12:56][INFO]: Planning the crew execution
-00:12:56 - LiteLLM:INFO: utils.py:3225 - 
-LiteLLM completion() model= gpt-4o-mini; provider = openai
-2026-03-05 00:12:56,385 - LiteLLM - INFO - 
-LiteLLM completion() model= gpt-4o-mini; provider = openai
-2026-03-05 00:13:03,442 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
-00:13:03 - LiteLLM:INFO: utils.py:1236 - Wrapper: Completed Call, calling success_handler
-2026-03-05 00:13:03,457 - LiteLLM - INFO - Wrapper: Completed Call, calling success_handler
-2026-03-05 00:13:03,710 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
-2026-03-05 00:13:03,955 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-03-05 00:50:45,761 - AntigravityEngine - INFO - Transitioning to state: ORCHESTRATION_L1
+2026-03-05 00:50:45,799 - chromadb.telemetry.product.posthog - INFO - Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+2026-03-05 00:50:45,810 - chromadb.telemetry.product.posthog - INFO - Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+2026-03-05 00:50:46,042 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2026-03-05 00:50:46,302 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
 # Agent: Orchestration Tier Manager/Router
 ## Task: You are executing inside the Antigravity 3-tier architecture.
 
 INPUTS:
 1) Reconstructed Prompt:
 ```markdown
-# System Prompt — Deterministic Test Handler
+# System Prompt — Production-Grade Reconstruction
 
 ## Role
-You are a **Deterministic Test Handler**.
+You are an **Elite Prompt Engineer & Systems Architect**.
 
 ## Objective
-Process the input **"test"** with maximum execution fidelity and produce a single definitive output.
+Reconstruct the provided `<input_data>` into a highly optimized, production-grade system prompt with **1:1 requirement coverage**.
 
-## Input
-- Accept the exact input string: **"test"**.
+## Input Data
+- `<input_data>` content: **test**
 
-## Process
-- Validate that the input matches **"test"**.
-- Execute the response pathway for the validated input.
+## Operational Constraints
+1. **Deterministic Phrasing & Decision Enforcement**
+   - Use **affirmative, active-voice directives** only.
+   - Eliminate optionality; select **one best approach**.
+   - If a missing requirement blocks success, **trigger Clarification Protocol**.
 
-## Output
-- Return the exact string: **"test"**.
+2. **Critical Clarification Protocol (Smart Gating)**
+   - Do not assume primary requirements or success criteria.
+   - Do not ask about minor details or standard specifics.
+   - **HALT** only if a blocking ambiguity prevents execution.
+
+3. **Token Efficiency vs. Content Density**
+   - Remove filler while preserving functional density.
+
+4. **Output Isolation**
+   - Output **only** the rewritten prompt in a **Markdown code block**.
+
+5. **Exhaustive Execution & Integrity**
+   - Map every requirement to an actionable instruction.
+   - Preserve nested logic and hierarchy.
+   - Avoid summarization or truncation.
+
+## Core Instructions
+
+### 1) Verification Gateway (Pre-Flight Decomposition)
+- **Index** all unique requirements, constraints, and success criteria.
+- **Validate** 100% coverage in the output.
+- If any requirement is missing, **re-process** until complete.
+
+### 2) Structural Refinement
+- Deconstruct any complex input into sequential, actionable steps.
+- Use advanced Markdown with headers and nested lists.
+- Enforce linear flow: **Input → Process → Output**.
+- Preserve all logic and dependencies.
+
+### 3) Technical Standards (Code/Scripting)
+- If code is required, produce **production-grade, publication-ready** output.
+- Use concrete implementations; no generic abstractions.
+- No placeholders, dummy calls, or simulated outputs.
+- Ensure completeness and cross-check against success criteria.
+
+## Execution Flow
+
+### Input
+- Accept the literal string: **"test"**.
+
+### Process
+- Preserve the input exactly, with no modification or interpretation.
+
+### Output
+- Emit the exact string: **test**.
 
 ## Completion Criteria
-- Output only the specified string.
-- Provide no additional text, metadata, or formatting.
+- Output only the exact string **test** with no additional text or formatting.
 ```
 
 2) Research Context:
-No official or primary documentation sources were accessed in this session. I cannot provide verified constraints, API limits, model configuration facts, or integration gotchas from official sources. Missing configuration: there is no authoritative documentation cited for the deterministic prompt processor’s runtime/host environment, input validation mechanism, or output handling; therefore execution requirements and limits cannot be validated against any vendor or platform specification.
+## Summary
+No official or primary documentation for the target runtime/platform of this deterministic prompt executor was provided, so I cannot verify concrete constraints, API limits, model configuration facts, or integration gotchas for the actual execution environment. Official platform documentation is required to validate operational limits and configuration behaviors (e.g., request/response schemas and rate limits are platform-defined and must be sourced from the vendor’s primary docs).
+
+## Citations[]
+- https://platform.openai.com/docs/api-reference
+- https://platform.openai.com/docs/guides/rate-limits
+
+## MissingConfig[]
+- Official documentation URLs for the exact runtime/platform that executes this prompt (to verify execution constraints, input/output handling, and integration gotchas).
+- Vendor identification for the execution environment (to bind requirements to a specific primary documentation set).
+- Official API/SDK references for any model/runtime used (to validate configuration parameters, limits, and behaviors).
+
+## RiskNotes[]
+- Without authoritative platform documentation, any stated limits or constraints would be speculative and may be incorrect.
+- Integration gotchas (e.g., input/output normalization, max payload size, or rate limiting) are platform-specific and cannot be validated without official sources.
+
 
 REQUIREMENTS:
 - Produce a complete, production-grade answer with no placeholder code and no TODOs.
 - Where code is required, output exact files (paths + full contents).
 - If shell operations are required, provide a single combined script.
 - Enforce a strict single-source-of-truth across files.
-1. **Input Validation**: Begin by validating the input against the expected exact string 'test'. Ensure a strict match before proceeding. If the input does not match, conclude execution and do not return any output.
-2. **Response Pathway Execution**: Upon successful validation of the input, execute the response pathway that has been predetermined for this validated input. This pathway should be explicitly defined to handle the input 'test' and should yield a specific output without deviation.
-3. **Output Delivery**: After executing the response pathway, prepare to deliver the predetermined output, which is the exact string 'test'. Ensure no other text, metadata, or formatting accompanies this output, adhering to the completion criteria specified in the task description.
-4. **Final Output Verification**: Double-check that the output exactly matches 'test'. Ensure that there are no additional characters, spaces, or formatting issues. If any discrepancies are found, revert to the input validation step and reassess. 
-5. **Exit Execution**: Once the output has been verified as accurate, conclude the execution of the Deterministic Test Handler. There are no further processes or interactions required.
-00:13:03 - LiteLLM:INFO: utils.py:3225 - 
+
+00:50:46 - LiteLLM:INFO: utils.py:3225 - 
 LiteLLM completion() model= gemini-3.1-pro-preview; provider = gemini
-2026-03-05 00:13:03,975 - LiteLLM - INFO - 
+2026-03-05 00:50:46,332 - LiteLLM - INFO - 
 LiteLLM completion() model= gemini-3.1-pro-preview; provider = gemini
-2026-03-05 00:13:11,853 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=AIzaSyCZzUovO6ywfljWM8JzxDLqEYV080Q8xQQ "HTTP/1.1 200 OK"
-00:13:11 - LiteLLM:INFO: utils.py:1236 - Wrapper: Completed Call, calling success_handler
-2026-03-05 00:13:11,877 - LiteLLM - INFO - Wrapper: Completed Call, calling success_handler
+2026-03-05 00:51:27,425 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=[REDACTED] "HTTP/1.1 200 OK"
+00:51:27 - LiteLLM:INFO: utils.py:1236 - Wrapper: Completed Call, calling success_handler
+2026-03-05 00:51:27,463 - LiteLLM - INFO - Wrapper: Completed Call, calling success_handler
 
 
 # Agent: Orchestration Tier Manager/Router
@@ -401,91 +874,91 @@ LiteLLM completion() model= gemini-3.1-pro-preview; provider = gemini
 test
 
 
-2026-03-05 00:13:12,090 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
-00:13:12 - LiteLLM:INFO: utils.py:3225 - 
+2026-03-05 00:51:27,709 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+00:51:27 - LiteLLM:INFO: utils.py:3225 - 
 LiteLLM completion() model= gemini-3.1-pro-preview; provider = gemini
-2026-03-05 00:13:12,116 - LiteLLM - INFO - 
+2026-03-05 00:51:27,736 - LiteLLM - INFO - 
 LiteLLM completion() model= gemini-3.1-pro-preview; provider = gemini
-2026-03-05 00:13:12,400 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=None "HTTP/1.1 400 Bad Request"
+2026-03-05 00:51:28,043 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=[REDACTED] "HTTP/1.1 400 Bad Request"
 
 Give Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new
 LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
 
-00:13:12 - LiteLLM:INFO: utils.py:3225 - 
+00:51:28 - LiteLLM:INFO: utils.py:3225 - 
 LiteLLM completion() model= gemini-3.1-pro-preview; provider = gemini
-2026-03-05 00:13:12,417 - LiteLLM - INFO - 
+2026-03-05 00:51:28,061 - LiteLLM - INFO - 
 LiteLLM completion() model= gemini-3.1-pro-preview; provider = gemini
-2026-03-05 00:13:12,713 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=None "HTTP/1.1 400 Bad Request"
+2026-03-05 00:51:28,378 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=[REDACTED] "HTTP/1.1 400 Bad Request"
 
 Give Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new
 LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
 
-00:13:12 - LiteLLM:INFO: utils.py:3225 - 
+00:51:28 - LiteLLM:INFO: utils.py:3225 - 
 LiteLLM completion() model= gemini-3.1-pro-preview; provider = gemini
-2026-03-05 00:13:12,726 - LiteLLM - INFO - 
+2026-03-05 00:51:28,393 - LiteLLM - INFO - 
 LiteLLM completion() model= gemini-3.1-pro-preview; provider = gemini
-2026-03-05 00:13:13,437 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=None "HTTP/1.1 400 Bad Request"
+2026-03-05 00:51:28,707 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=[REDACTED] "HTTP/1.1 400 Bad Request"
 
 Give Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new
 LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
 
-00:13:13 - LiteLLM:INFO: utils.py:3225 - 
+00:51:28 - LiteLLM:INFO: utils.py:3225 - 
 LiteLLM completion() model= gemini-3.1-pro-preview; provider = gemini
-2026-03-05 00:13:13,453 - LiteLLM - INFO - 
+2026-03-05 00:51:28,718 - LiteLLM - INFO - 
 LiteLLM completion() model= gemini-3.1-pro-preview; provider = gemini
-2026-03-05 00:13:13,740 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=None "HTTP/1.1 400 Bad Request"
+2026-03-05 00:51:29,020 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=[REDACTED] "HTTP/1.1 400 Bad Request"
 
 Give Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new
 LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
 
-00:13:13 - LiteLLM:INFO: utils.py:3225 - 
+00:51:29 - LiteLLM:INFO: utils.py:3225 - 
 LiteLLM completion() model= gemini-3.1-pro-preview; provider = gemini
-2026-03-05 00:13:13,761 - LiteLLM - INFO - 
+2026-03-05 00:51:29,037 - LiteLLM - INFO - 
 LiteLLM completion() model= gemini-3.1-pro-preview; provider = gemini
-2026-03-05 00:13:14,066 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=None "HTTP/1.1 400 Bad Request"
+2026-03-05 00:51:29,364 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=[REDACTED] "HTTP/1.1 400 Bad Request"
 
 Give Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new
 LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
 
-00:13:14 - LiteLLM:INFO: utils.py:3225 - 
+00:51:29 - LiteLLM:INFO: utils.py:3225 - 
 LiteLLM completion() model= gemini-3.1-pro-preview; provider = gemini
-2026-03-05 00:13:14,085 - LiteLLM - INFO - 
+2026-03-05 00:51:29,380 - LiteLLM - INFO - 
 LiteLLM completion() model= gemini-3.1-pro-preview; provider = gemini
-2026-03-05 00:13:14,381 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=None "HTTP/1.1 400 Bad Request"
+2026-03-05 00:51:29,679 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=[REDACTED] "HTTP/1.1 400 Bad Request"
 
 Give Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new
 LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
 
-00:13:14 - LiteLLM:INFO: utils.py:3225 - 
+00:51:29 - LiteLLM:INFO: utils.py:3225 - 
 LiteLLM completion() model= gemini-3.1-pro-preview; provider = gemini
-2026-03-05 00:13:14,403 - LiteLLM - INFO - 
+2026-03-05 00:51:29,698 - LiteLLM - INFO - 
 LiteLLM completion() model= gemini-3.1-pro-preview; provider = gemini
-2026-03-05 00:13:14,691 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=None "HTTP/1.1 400 Bad Request"
+2026-03-05 00:51:29,992 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=[REDACTED] "HTTP/1.1 400 Bad Request"
 
 Give Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new
 LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
 
-00:13:14 - LiteLLM:INFO: utils.py:3225 - 
+00:51:30 - LiteLLM:INFO: utils.py:3225 - 
 LiteLLM completion() model= gemini-3.1-pro-preview; provider = gemini
-2026-03-05 00:13:14,717 - LiteLLM - INFO - 
+2026-03-05 00:51:30,023 - LiteLLM - INFO - 
 LiteLLM completion() model= gemini-3.1-pro-preview; provider = gemini
-2026-03-05 00:13:15,007 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=None "HTTP/1.1 400 Bad Request"
+2026-03-05 00:51:30,322 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=[REDACTED] "HTTP/1.1 400 Bad Request"
 
 Give Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new
 LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
 
-00:13:15 - LiteLLM:INFO: utils.py:3225 - 
+00:51:30 - LiteLLM:INFO: utils.py:3225 - 
 LiteLLM completion() model= gemini-3.1-pro-preview; provider = gemini
-2026-03-05 00:13:15,033 - LiteLLM - INFO - 
+2026-03-05 00:51:30,348 - LiteLLM - INFO - 
 LiteLLM completion() model= gemini-3.1-pro-preview; provider = gemini
-2026-03-05 00:13:15,324 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=None "HTTP/1.1 400 Bad Request"
+2026-03-05 00:51:30,645 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=[REDACTED] "HTTP/1.1 400 Bad Request"
 
 Give Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new
 LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
 
-2026-03-05 00:13:15,347 - AntigravityEngine - INFO - Transitioning to state: VERIFICATION
-2026-03-05 00:13:15,348 - AntigravityEngine - INFO - Pipeline successful. Verification Passed.
+2026-03-05 00:51:30,678 - AntigravityEngine - INFO - Transitioning to state: VERIFICATION
+2026-03-05 00:51:30,681 - AntigravityEngine - INFO - Pipeline successful. Verification Passed.
 
 ✅ Execution complete! Results saved to /private/tmp/antigravity_workspace/execution_result.json
-2026-03-05 00:13:15,349 - AntigravityCLI - INFO - Pipeline execution finished.
-(antigravity-3tier-crewai) vics-macbook-pro@MacBook-Pro 3-tier-multi-agent-architecture-work % 
+2026-03-05 00:51:30,684 - AntigravityCLI - INFO - Pipeline execution finished.
+(antigravity-3tier-crewai) vics-macbook-pro@MacBook-Pro 3-tier-multi-agent-architecture % 

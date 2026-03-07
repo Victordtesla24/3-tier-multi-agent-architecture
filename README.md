@@ -157,7 +157,9 @@ For non-IDE environments, Docker containers, or CI/CD pipelines, you can run the
 
 ```bash
 # Run a prompt through the full 3-tier CrewAI pipeline
-# NOTE: Always specify --workspace pointing to a writable directory.
+# NOTE: --workspace is optional. If omitted, defaults to ANTIGRAVITY_WORKSPACE_DIR env var
+#       or <project_root>/workspaces/cli-default. Specify it explicitly to control where
+#       pipeline artifacts and telemetry are written.
 export PYTHONPATH=src
 uv run python src/orchestrator/antigravity-cli.py \
   --workspace /tmp/antigravity_workspace \
@@ -165,7 +167,7 @@ uv run python src/orchestrator/antigravity-cli.py \
   --verbose
 ```
 
-> **Important:** The `--workspace` flag must point to a directory you own and have write access to. The pipeline writes structured telemetry to `<workspace>/.agent/memory/execution_log.json`.
+> **Important:** The `--workspace` flag is **optional**. When specified, it must point to a directory you own and have write access to. When omitted, the CLI resolves the workspace in this order: (1) `ANTIGRAVITY_WORKSPACE_DIR` environment variable, (2) `<project_root>/workspaces/cli-default`. The pipeline writes structured telemetry to `<workspace>/.agent/memory/execution_log.json`.
 
 ```bash
 # Run the full test suite

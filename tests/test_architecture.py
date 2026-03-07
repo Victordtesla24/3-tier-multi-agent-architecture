@@ -1,9 +1,5 @@
-import os
 import json
-import subprocess
-import pytest
 from pathlib import Path
-from unittest.mock import patch, MagicMock
 import sys
 
 sys.path.append(str(Path(__file__).parent.parent / "src"))
@@ -50,7 +46,7 @@ def test_pipeline_telemetry_is_written():
     if log_path.exists():
         log_path.unlink()
 
-    engine = OrchestrationStateMachine(workspace_dir=workspace)
+    _ = OrchestrationStateMachine(workspace_dir=workspace)
 
     # The engine constructor creates the log file
     assert log_path.exists(), "Execution log was not created."

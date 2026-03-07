@@ -32,16 +32,25 @@ for key in "${required_keys[@]}"; do
 done
 
 echo "🧪 Validating toolchain compatibility..."
-if ! "${UV_PROJECT_ENVIRONMENT}/bin/python" - <<'PY'
+CREWAI_TOOLS_CHECK=$("${UV_PROJECT_ENVIRONMENT}/bin/python" - 2>&1 <<'PY'
 try:
     from crewai_tools import FileReadTool, FileWriterTool  # noqa: F401
-    print("crewai_tools import check passed")
+    print("ok")
+except ImportError as exc:
+    print(f"IMPORT_ERROR: {exc}")
 except Exception as exc:
-    print(f"crewai_tools import check failed: {type(exc).__name__}: {exc}")
-    raise SystemExit(1)
+    print(f"ERROR: {type(exc).__name__}: {exc}")
 PY
-then
-    echo "⚠️  WARNING: crewai_tools import failed. Local workspace tool fallback will be used at runtime."
+)
+
+if echo "$CREWAI_TOOLS_CHECK" | grep -q "^ok"; then
+    echo "✅ crewai_tools import check passed"
+elif echo "$CREWAI_TOOLS_CHECK" | grep -q "^IMPORT_ERROR"; then
+    echo "❌ ERROR: crewai_tools import failed — ${CREWAI_TOOLS_CHECK}"
+    echo "   Remediation: Run 'uv add --upgrade crewai-tools' or check installed crewai version."
+    echo "   The local workspace tool fallback will be used at runtime, but production tool availability is degraded."
+else
+    echo "⚠️  WARNING: crewai_tools check returned unexpected output: ${CREWAI_TOOLS_CHECK}"
 fi
 
 # Step 3: Verify directory structure

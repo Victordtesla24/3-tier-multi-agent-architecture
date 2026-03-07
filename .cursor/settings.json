@@ -1,0 +1,49 @@
+{
+  "plugins": {
+    "parallel": {
+      "enabled": true
+    },
+    "compound-engineering": {
+      "enabled": true
+    },
+    "cursor-team-kit": {
+      "enabled": true
+    },
+    "continual-learning": {
+      "enabled": true
+    },
+    "tldraw": {
+      "enabled": true
+    },
+    "superpowers": {
+      "enabled": true
+    },
+    "create-plugin": {
+      "enabled": true
+    },
+    "runlayer": {
+      "enabled": true
+    },
+    "amplitude": {
+      "enabled": true
+    },
+    "huggingface-skills": {
+      "enabled": true
+    },
+    "functions": {
+      "enabled": true
+    },
+    "convex": {
+      "enabled": true
+    },
+    "cloudflare": {
+      "enabled": true
+    },
+    "browserstack": {
+      "enabled": true
+    },
+    "figma": {
+      "enabled": true
+    }
+  }
+}

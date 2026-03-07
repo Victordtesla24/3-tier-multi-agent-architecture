@@ -66,5 +66,5 @@ if __name__ == "__main__":
         "new_chat_hook": ".agent/rules/system-verification-agent.md"
     }
 
-    logger.info(f"Applying robust architectural hooks via parsed YAML...")
+    logger.info("Applying robust architectural hooks via parsed YAML...")
     merge_config_safely(gemini_conf, settingsToInject)

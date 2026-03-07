@@ -13,6 +13,21 @@ from engine.llm_config import (
     build_model_matrix,
     classify_provider_error,
 )
+from engine.orchestration_tools import (
+    CompleteTaskTool,
+    ReadRuntimeConfigTool,
+    RunBenchmarksTool,
+    RunTestsTool,
+    UpdateRuntimeConfigTool,
+)
+from engine.project_root_tools import ProjectRootFileReadTool, ProjectRootFileWriteTool
+from engine.workflow_primitives import (
+    llm_call,
+    load_prompt_template,
+    normalize_research_markdown,
+    sanitize_user_input,
+    write_workspace_file,
+)
 from engine.workspace_tools import WorkspaceFileReadTool, WorkspaceFileWriteTool
 
 # Project root is two levels up from this module (src/engine/ → project root)
@@ -120,86 +135,47 @@ class CrewAIThreeTierOrchestrator:
         return match.group(1).strip() or result.strip()
 
     @staticmethod
-    def _extract_urls(text: str) -> list[str]:
-        urls = re.findall(r"https?://[^\s)]+", text)
-        deduped: list[str] = []
-        seen = set()
-        for url in urls:
-            clean = url.rstrip(".,")
-            if clean in seen:
-                continue
-            seen.add(clean)
-            deduped.append(clean)
-        return deduped
+    def _extract_input_data(raw_prompt: str) -> str:
+        """
+        Backward-compatible contract for tests/integrations that still call the
+        historical extraction method.
+        """
+        return sanitize_user_input(raw_prompt)
 
-    def _normalise_research_context(self, raw: str) -> str:
-        body = raw.strip()
-        required_markers = ("## Summary", "## Citations[]", "## MissingConfig[]", "## RiskNotes[]")
-        if all(marker in body for marker in required_markers):
-            return f"{body}\n"
-
-        urls = self._extract_urls(body)
-
-        summary = body.split("\n", maxsplit=1)[0].strip()
-        if not summary:
-            summary = "Research agent returned empty output."
-
-        missing_config: list[str] = []
-        lowered = body.lower()
-        if "missing configuration" in lowered:
-            missing_config.append(body)
-        if "no official or primary documentation sources were accessed" in lowered:
-            missing_config.append("No primary-source citations were returned by the research agent.")
-
-        risk_notes: list[str] = []
-        if not urls:
-            risk_notes.append("No citation URLs found; claims are unverifiable.")
-        if "cannot provide verified constraints" in lowered:
-            risk_notes.append("Research output explicitly states constraints were not verified.")
-
-        citation_lines = "\n".join(f"- {url}" for url in urls) if urls else "- None"
-        missing_lines = "\n".join(f"- {item}" for item in missing_config) if missing_config else "- None"
-        risk_lines = "\n".join(f"- {item}" for item in risk_notes) if risk_notes else "- None"
-
-        return (
-            "## Summary\n"
-            f"- {summary}\n\n"
-            "## Citations[]\n"
-            f"{citation_lines}\n\n"
-            "## MissingConfig[]\n"
-            f"{missing_lines}\n\n"
-            "## RiskNotes[]\n"
-            f"{risk_lines}\n"
-        )
+    @staticmethod
+    def _normalise_research_context(raw: str) -> str:
+        """
+        Backward-compatible wrapper around the shared workflow primitive.
+        """
+        return normalize_research_markdown(raw)
 
     def _build_worker_tools(self) -> list[Any]:
-        # Primary path: official crewai-tools package.
-        try:
-            from crewai_tools import FileReadTool, FileWriterTool
-
-            self._emit_telemetry(
-                "TOOLING_INFO",
-                {
-                    "stage": "execution_hierarchical",
-                    "tooling": "crewai_tools",
-                    "status": "active",
-                },
-            )
-            return [FileReadTool(), FileWriterTool()]
-        except Exception as tool_error:
-            # Deterministic local fallback keeps file capabilities active.
-            self._emit_telemetry(
-                "TOOLING_FALLBACK",
-                {
-                    "stage": "execution_hierarchical",
-                    "tooling": "workspace_tools",
-                    "reason": f"{type(tool_error).__name__}: {tool_error}",
-                },
-            )
-            return [
-                WorkspaceFileReadTool(workspace_root=str(self.workspace)),
-                WorkspaceFileWriteTool(workspace_root=str(self.workspace)),
-            ]
+        # Safe-by-default tooling: scoped workspace tools + restricted project-root
+        # tools + explicit health/runtime controls.
+        tools = [
+            WorkspaceFileReadTool(workspace_root=str(self.workspace)),
+            WorkspaceFileWriteTool(workspace_root=str(self.workspace)),
+            ProjectRootFileReadTool(project_root=str(_MODULE_PROJECT_ROOT)),
+            ProjectRootFileWriteTool(project_root=str(_MODULE_PROJECT_ROOT)),
+            RunTestsTool(project_root=str(_MODULE_PROJECT_ROOT)),
+            RunBenchmarksTool(project_root=str(_MODULE_PROJECT_ROOT)),
+            ReadRuntimeConfigTool(
+                project_root=str(_MODULE_PROJECT_ROOT),
+                workspace=str(self.workspace),
+            ),
+            UpdateRuntimeConfigTool(workspace=str(self.workspace)),
+            CompleteTaskTool(),
+        ]
+        self._emit_telemetry(
+            "TOOLING_INFO",
+            {
+                "stage": "execution_hierarchical",
+                "tooling": "workspace_projectroot_health_config",
+                "status": "active",
+                "tool_count": len(tools),
+            },
+        )
+        return tools
 
     @staticmethod
     def _is_soft_failure(result: str) -> bool:
@@ -228,7 +204,7 @@ class CrewAIThreeTierOrchestrator:
                 fallback_used=False,
                 status="started",
             )
-            primary_result = runner(tier.primary)
+            primary_result = llm_call(tier.primary, runner=runner)
             if self._is_soft_failure(primary_result):
                 raise RuntimeError("Primary model returned a soft-failure response.")
             self._emit_provider_attempt(
@@ -268,7 +244,7 @@ class CrewAIThreeTierOrchestrator:
                     fallback_used=True,
                     status="started",
                 )
-                fallback_result = runner(tier.fallback)
+                fallback_result = llm_call(tier.fallback, runner=runner)
                 if self._is_soft_failure(fallback_result):
                     raise RuntimeError("Fallback model returned a soft-failure response.")
                 self._emit_provider_attempt(
@@ -313,53 +289,16 @@ class CrewAIThreeTierOrchestrator:
                     f"Fallback failed with {type(fallback_error).__name__}: {fallback_error}."
                 ) from fallback_error
 
-    def _extract_input_data(self, raw_prompt: str) -> str:
-        """
-        If raw_prompt contains <input_data>...</input_data>, extract its inner payload.
-        Otherwise return raw_prompt as-is.
-        """
-        match = re.search(
-            r"<input_data>(.*?)</input_data>",
-            raw_prompt,
-            flags=re.DOTALL | re.IGNORECASE,
-        )
-        if match:
-            return match.group(1).strip()
-        return raw_prompt.strip()
-
-    def _sanitize_prompt(self, payload: str) -> str:
-        """
-        Applies basic input sanitization to strip potential system prompt injection attacks.
-        """
-        sanitized = re.sub(
-            r"(?i)\b(ignore previous instructions|you are now|system prompt|bypass|override)\b",
-            "[REDACTED]",
-            payload,
-        )
-        sanitized = re.sub(
-            r"(?i)<script.*?>.*?</script>",
-            "[REMOVED SCRIPT]",
-            sanitized,
-            flags=re.DOTALL,
-        )
-        return sanitized.strip()
-
     def reconstruct_prompt(self, raw_prompt: str) -> str:
         """
         Executes the Prompt Reconstruction Protocol as a CrewAI task using Level 1 models.
         """
-        template_path = _MODULE_PROJECT_ROOT / "docs" / "architecture" / "prompt-reconstruction.md"
-        if not template_path.exists():
-            template_path = self.workspace / "docs" / "architecture" / "prompt-reconstruction.md"
-        if not template_path.exists():
-            raise FileNotFoundError(
-                f"Missing prompt reconstruction template at {template_path}. "
-                "This integration expects the existing 3-tier architecture docs to be present."
-            )
-
-        template = template_path.read_text(encoding="utf-8")
-        raw_payload = self._extract_input_data(raw_prompt)
-        payload = self._sanitize_prompt(raw_payload)
+        template = load_prompt_template(
+            "prompt-reconstruction.md",
+            workspace=self.workspace,
+            project_root=_MODULE_PROJECT_ROOT,
+        )
+        payload = sanitize_user_input(raw_prompt)
         reconstruction_prompt = template.replace("{{INPUT_DATA}}", payload)
 
         def _runner(llm: LLM) -> str:
@@ -396,8 +335,7 @@ class CrewAIThreeTierOrchestrator:
             runner=_runner,
         )
 
-        out_path = self.workspace / ".agent" / "tmp" / "reconstructed_prompt.md"
-        out_path.write_text(result, encoding="utf-8")
+        write_workspace_file(self.workspace, ".agent/tmp/reconstructed_prompt.md", result)
         return result
 
     def run_research(self, reconstructed_prompt: str) -> str:
@@ -455,13 +393,16 @@ class CrewAIThreeTierOrchestrator:
             runner=_runner,
         )
 
-        normalised = self._normalise_research_context(result)
-
-        out_path = self.workspace / ".agent" / "tmp" / "research-context.md"
-        out_path.write_text(normalised, encoding="utf-8")
+        normalised = normalize_research_markdown(result)
+        write_workspace_file(self.workspace, ".agent/tmp/research-context.md", normalised)
         return normalised
 
-    def execute(self, reconstructed_prompt: str, research_context: str) -> str:
+    def execute(
+        self,
+        reconstructed_prompt: str,
+        research_context: str,
+        context_block: str | None = None,
+    ) -> str:
         """
         Executes the main 3-tier Crew using a hierarchical process:
           - Manager/router: orchestration-tier models
@@ -501,11 +442,24 @@ class CrewAIThreeTierOrchestrator:
             )
 
             worker_tools = self._build_worker_tools()
+            tooling_manifest = (
+                "Tooling Manifest:\n"
+                "- workspace_file_read/workspace_file_write: read/write files under the active workspace only.\n"
+                "- project_root_file_read/project_root_file_write: read/write only in "
+                ".agent/rules/*, .agent/workflows/*, docs/architecture/*.\n"
+                "- run_tests/run_benchmarks: execute repository verification commands and return machine-readable output.\n"
+                "- read_runtime_configuration/update_runtime_configuration: inspect or safely update runtime config.\n"
+                "- complete_task: emit explicit completion signal with status success|partial|blocked."
+            )
 
             worker = Agent(
                 role="Level 2 Execution/Worker Agent",
                 goal="Implement atomic tasks with zero placeholders and explicit error handling.",
-                backstory="You are an elite staff engineer who produces complete, executable artefacts with no TODOs and no simulated logic.",
+                backstory=(
+                    "You are an elite staff engineer who produces complete, executable artefacts "
+                    "with no TODOs and no simulated logic.\n\n"
+                    f"{tooling_manifest}"
+                ),
                 llm=level2_llm,
                 verbose=self.verbose,
                 allow_delegation=False,
@@ -522,6 +476,8 @@ class CrewAIThreeTierOrchestrator:
                     f"{reconstructed_prompt}\n\n"
                     "2) Research Context:\n"
                     f"{research_context}\n\n"
+                    "3) Runtime/Workspace Context:\n"
+                    f"{context_block or 'No additional context supplied.'}\n\n"
                     "REQUIREMENTS:\n"
                     "- Produce a complete, production-grade answer with no placeholder code and no TODOs.\n"
                     "- Where code is required, output exact files (paths + full contents).\n"
@@ -637,6 +593,5 @@ class CrewAIThreeTierOrchestrator:
                     f"Fallback failed with {type(fallback_error).__name__}: {fallback_error}."
                 ) from fallback_error
 
-        out_path = self.workspace / ".agent" / "tmp" / "final_output.md"
-        out_path.write_text(result, encoding="utf-8")
+        write_workspace_file(self.workspace, ".agent/tmp/final_output.md", result)
         return result
