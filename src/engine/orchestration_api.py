@@ -42,6 +42,12 @@ class OrchestrationRunResult:
     completion_status: CompletionStatus
     completion_summary: str
     failed_stage: str | None
+    execution_mode: str = "legacy_hierarchical"
+    plan_id: str | None = None
+    task_count: int = 0
+    parallel_batch_count: int = 0
+    worker_retry_count: int = 0
+    task_failure_count: int = 0
     stage_progress: Mapping[str, Any] = field(default_factory=dict)
     error: str | None = None
     extra_metadata: Mapping[str, Any] = field(default_factory=dict)
@@ -89,6 +95,12 @@ def run_orchestration(config: OrchestrationRunConfig) -> OrchestrationRunResult:
                 completion_status="blocked",
                 completion_summary="Provider runtime validation failed before pipeline execution.",
                 failed_stage="INIT",
+                execution_mode="legacy_hierarchical",
+                plan_id=None,
+                task_count=0,
+                parallel_batch_count=0,
+                worker_retry_count=0,
+                task_failure_count=0,
                 stage_progress={},
                 error=str(exc),
                 extra_metadata={},
@@ -129,12 +141,29 @@ def run_orchestration(config: OrchestrationRunConfig) -> OrchestrationRunResult:
                 "Pipeline raised an exception before completion metadata was finalised.",
             ),
             failed_stage=completion_snapshot.get("failed_stage"),
+            execution_mode=str(completion_snapshot.get("execution_mode", "legacy_hierarchical")),
+            plan_id=completion_snapshot.get("plan_id"),
+            task_count=int(completion_snapshot.get("task_count", 0) or 0),
+            parallel_batch_count=int(completion_snapshot.get("parallel_batch_count", 0) or 0),
+            worker_retry_count=int(completion_snapshot.get("worker_retry_count", 0) or 0),
+            task_failure_count=int(completion_snapshot.get("task_failure_count", 0) or 0),
             stage_progress=completion_snapshot.get("stage_progress", {}),
             error=str(exc),
             extra_metadata={
                 k: v
                 for k, v in completion_snapshot.items()
-                if k not in {"completion_status", "completion_summary", "failed_stage", "stage_progress"}
+                if k not in {
+                    "completion_status",
+                    "completion_summary",
+                    "failed_stage",
+                    "execution_mode",
+                    "plan_id",
+                    "task_count",
+                    "parallel_batch_count",
+                    "worker_retry_count",
+                    "task_failure_count",
+                    "stage_progress",
+                }
             },
         )
 
@@ -162,6 +191,12 @@ def run_orchestration(config: OrchestrationRunConfig) -> OrchestrationRunResult:
         completion_status=metadata.get("completion_status", "pending"),
         completion_summary=metadata.get("completion_summary", "No completion summary available."),
         failed_stage=metadata.get("failed_stage"),
+        execution_mode=str(metadata.get("execution_mode", "legacy_hierarchical")),
+        plan_id=metadata.get("plan_id"),
+        task_count=int(metadata.get("task_count", 0) or 0),
+        parallel_batch_count=int(metadata.get("parallel_batch_count", 0) or 0),
+        worker_retry_count=int(metadata.get("worker_retry_count", 0) or 0),
+        task_failure_count=int(metadata.get("task_failure_count", 0) or 0),
         stage_progress=metadata.get("stage_progress", {}),
         error=None,
         extra_metadata={k: v for k, v in metadata.items() if k not in {
@@ -174,6 +209,12 @@ def run_orchestration(config: OrchestrationRunConfig) -> OrchestrationRunResult:
             "completion_status",
             "completion_summary",
             "failed_stage",
+            "execution_mode",
+            "plan_id",
+            "task_count",
+            "parallel_batch_count",
+            "worker_retry_count",
+            "task_failure_count",
             "stage_progress",
         }},
     )
@@ -205,9 +246,15 @@ class SubmitPromptResponse:
     completion_status: CompletionStatus
     completion_summary: str
     failed_stage: str | None
-    stage_progress: Mapping[str, Any]
-    error: str | None
-    metadata: Mapping[str, Any]
+    execution_mode: str = "legacy_hierarchical"
+    plan_id: str | None = None
+    task_count: int = 0
+    parallel_batch_count: int = 0
+    worker_retry_count: int = 0
+    task_failure_count: int = 0
+    stage_progress: Mapping[str, Any] = field(default_factory=dict)
+    error: str | None = None
+    metadata: Mapping[str, Any] = field(default_factory=dict)
 
 
 def _default_workspace() -> Path:
@@ -249,6 +296,12 @@ def submit_prompt(request: SubmitPromptRequest) -> SubmitPromptResponse:
         completion_status=result.completion_status,
         completion_summary=result.completion_summary,
         failed_stage=result.failed_stage,
+        execution_mode=result.execution_mode,
+        plan_id=result.plan_id,
+        task_count=result.task_count,
+        parallel_batch_count=result.parallel_batch_count,
+        worker_retry_count=result.worker_retry_count,
+        task_failure_count=result.task_failure_count,
         stage_progress=result.stage_progress,
         error=result.error,
         metadata=metadata,

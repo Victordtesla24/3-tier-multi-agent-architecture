@@ -43,3 +43,18 @@ line-length = 88
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 norecursedirs = [".git", ".venv", "node_modules", "__pycache__", ".pytest_cache"]
+
+[tool.mypy]
+python_version = "3.12"
+mypy_path = ["src"]
+namespace_packages = true
+explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+module = [
+    "crewai",
+    "crewai.*",
+    "langgraph",
+    "langgraph.*",
+]
+ignore_missing_imports = true

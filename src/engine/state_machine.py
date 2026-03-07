@@ -80,6 +80,12 @@ class OrchestrationStateMachine:
         self.stage_progress: Dict[str, Dict[str, Any]] = {}
         self._stage_started_monotonic: Dict[str, float] = {}
         self._last_verification_error: VerificationFailedError | None = None
+        self.execution_mode = "legacy_hierarchical"
+        self.plan_id: str | None = None
+        self.task_count = 0
+        self.parallel_batch_count = 0
+        self.worker_retry_count = 0
+        self.task_failure_count = 0
         self._reset_execution_tracking()
 
         # Ensure observability path exists
@@ -95,6 +101,12 @@ class OrchestrationStateMachine:
         self.failed_stage = None
         self._stage_started_monotonic = {}
         self._last_verification_error = None
+        self.execution_mode = "legacy_hierarchical"
+        self.plan_id = None
+        self.task_count = 0
+        self.parallel_batch_count = 0
+        self.worker_retry_count = 0
+        self.task_failure_count = 0
         self.stage_progress = {
             stage: {
                 "status": "pending",
@@ -164,6 +176,12 @@ class OrchestrationStateMachine:
             "completed_stage_count": completed_count,
             "total_stage_count": len(self.stage_progress),
             "can_resume": self.completion_status == "blocked",
+            "execution_mode": self.execution_mode,
+            "plan_id": self.plan_id,
+            "task_count": self.task_count,
+            "parallel_batch_count": self.parallel_batch_count,
+            "worker_retry_count": self.worker_retry_count,
+            "task_failure_count": self.task_failure_count,
         }
 
     def _structured_log(self, event_type: str, details: dict):
@@ -241,6 +259,39 @@ class OrchestrationStateMachine:
         http_status = details.get("http_status")
         if isinstance(http_status, int) and 400 <= http_status < 500:
             self.provider_4xx_count += 1
+
+        if event_type == "EXECUTION_PLAN_CREATED":
+            self.execution_mode = str(details.get("execution_mode", "task_graph"))
+            self.plan_id = str(details.get("plan_id")) if details.get("plan_id") else None
+            self.task_count = int(details.get("task_count", 0))
+        elif event_type == "TASK_GRAPH_BATCH_COMPLETED":
+            self.parallel_batch_count = max(
+                self.parallel_batch_count,
+                int(details.get("batch_index", 0)),
+            )
+        elif event_type == "TASK_EXECUTION_RESULT":
+            attempt_count = int(details.get("attempt_count", 0))
+            self.worker_retry_count += max(attempt_count - 1, 0)
+            if details.get("status") == "failed":
+                self.task_failure_count += 1
+        elif event_type == "TASK_GRAPH_COMPLETE":
+            self.execution_mode = str(details.get("execution_mode", self.execution_mode))
+            self.parallel_batch_count = int(
+                details.get("parallel_batch_count", self.parallel_batch_count)
+            )
+            self.worker_retry_count = int(
+                details.get("worker_retry_count", self.worker_retry_count)
+            )
+            self.task_failure_count = int(
+                details.get("task_failure_count", self.task_failure_count)
+            )
+        elif event_type in {"EXECUTION_MODE_SELECTED", "EXECUTION_MODE_FALLBACK"}:
+            self.execution_mode = str(
+                details.get("to_mode")
+                or details.get("execution_mode")
+                or self.execution_mode
+            )
+
         self._structured_log(event_type, details)
 
     def _record_httpx_status(self, http_status: int, message: str) -> None:
@@ -367,6 +418,12 @@ class OrchestrationStateMachine:
             "reconstructed_prompt_path": str(tmp_dir / "reconstructed_prompt.md"),
             "research_context_path": str(tmp_dir / "research-context.md"),
             "provider_4xx_count": self.provider_4xx_count,
+            "execution_mode": self.execution_mode,
+            "plan_id": self.plan_id,
+            "task_count": self.task_count,
+            "parallel_batch_count": self.parallel_batch_count,
+            "worker_retry_count": self.worker_retry_count,
+            "task_failure_count": self.task_failure_count,
         }
         metadata.update(self.get_completion_snapshot())
         return success, metadata
@@ -418,7 +475,7 @@ class OrchestrationStateMachine:
             self._mark_stage(
                 self.state,
                 "in_progress",
-                "Delegating hierarchical execution to crew manager and worker agents.",
+                "Delegating hardened task-graph execution with legacy fallback available.",
             )
             self._structured_log("STATE_TRANSITION", {"status": "delegating_to_crewai"})
             context_block = build_orchestration_context_block(

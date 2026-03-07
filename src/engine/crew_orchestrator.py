@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import re
 from pathlib import Path
@@ -22,6 +23,16 @@ from engine.orchestration_tools import (
     UpdateRuntimeConfigTool,
 )
 from engine.project_root_tools import ProjectRootFileReadTool, ProjectRootFileWriteTool
+from engine.runtime_graph import (
+    DAGTaskExecutor,
+    OrchestrationPlan,
+    PlanningFailureError,
+    ReflexiveTaskWorker,
+    SemanticTaskPlanner,
+    TaskGraphExecutionError,
+    TaskGraphExecutionSummary,
+    WorkerTask,
+)
 from engine.workflow_primitives import (
     llm_call,
     load_prompt_template,
@@ -150,7 +161,19 @@ class CrewAIThreeTierOrchestrator:
         """
         return normalize_research_markdown(raw)
 
-    def _build_worker_tools(self) -> list[Any]:
+    @staticmethod
+    def _worker_tooling_manifest() -> str:
+        return (
+            "Tooling Manifest:\n"
+            "- workspace_file_read/workspace_file_write: read/write files under the active workspace only.\n"
+            "- project_root_file_read/project_root_file_write: read/write only in "
+            ".agent/rules/*, .agent/workflows/*, docs/architecture/*.\n"
+            "- run_tests/run_benchmarks: execute repository verification commands and return machine-readable output.\n"
+            "- read_runtime_configuration/update_runtime_configuration: inspect or safely update runtime config.\n"
+            "- complete_task: emit explicit completion signal with status success|partial|blocked."
+        )
+
+    def _build_worker_tools(self, *, stage_name: str = "execution_hierarchical") -> list[Any]:
         # Safe-by-default tooling: scoped workspace tools + restricted project-root
         # tools + explicit health/runtime controls.
         tools = [
@@ -170,13 +193,55 @@ class CrewAIThreeTierOrchestrator:
         self._emit_telemetry(
             "TOOLING_INFO",
             {
-                "stage": "execution_hierarchical",
+                "stage": stage_name,
                 "tooling": "workspace_projectroot_health_config",
                 "status": "active",
                 "tool_count": len(tools),
             },
         )
         return tools
+
+    def _run_single_agent_task(
+        self,
+        *,
+        llm: LLM,
+        role: str,
+        goal: str,
+        backstory: str,
+        description: str,
+        expected_output: str,
+        tools: list[Any] | None = None,
+        allow_delegation: bool = False,
+        max_reasoning_attempts: int = 3,
+    ) -> str:
+        agent_kwargs: dict[str, Any] = {
+            "role": role,
+            "goal": goal,
+            "backstory": backstory,
+            "llm": llm,
+            "verbose": self.verbose,
+            "allow_delegation": allow_delegation,
+            "reasoning": True,
+            "max_reasoning_attempts": max_reasoning_attempts,
+        }
+        if tools is not None:
+            agent_kwargs["tools"] = tools
+
+        agent = Agent(**agent_kwargs)
+        task = Task(
+            description=description,
+            expected_output=expected_output,
+            agent=agent,
+        )
+        crew = Crew(
+            agents=[agent],
+            tasks=[task],
+            process=Process.sequential,
+            memory=True,
+            verbose=self.verbose,
+            cache=True,
+        )
+        return self._extract_final_answer(str(crew.kickoff()))
 
     @staticmethod
     def _is_soft_failure(result: str) -> bool:
@@ -304,6 +369,275 @@ class CrewAIThreeTierOrchestrator:
                     tier=tier_name,
                 ) from fallback_error
 
+    def _plan_execution_graph(
+        self,
+        *,
+        source_prompt: str,
+        research_context: str,
+        context_block: str | None,
+    ) -> OrchestrationPlan:
+        def _planner_call(planner_prompt: str) -> str:
+            def _runner(llm: LLM) -> str:
+                return self._run_single_agent_task(
+                    llm=llm,
+                    role="Semantic Task Planner",
+                    goal="Break the objective into a strict, dependency-valid internal task graph.",
+                    backstory=(
+                        "You are an internal execution planner. You emit only strict JSON "
+                        "task graphs that can be validated and executed without ambiguity."
+                    ),
+                    description=planner_prompt,
+                    expected_output=(
+                        "JSON object with original_query and tasks[]. "
+                        "No markdown fences or commentary."
+                    ),
+                )
+
+            return self._run_stage_with_tier_fallback(
+                stage_name="execution_planning",
+                tier_name="level1",
+                tier=self.models.level1,
+                runner=_runner,
+            )
+
+        planner = SemanticTaskPlanner(llm_planner=_planner_call)
+        plan = planner.create_plan(
+            source_prompt=source_prompt,
+            research_context=research_context,
+            context_block=context_block,
+        )
+        self._emit_telemetry(
+            "EXECUTION_PLAN_CREATED",
+            {
+                "execution_mode": "task_graph",
+                "plan_id": plan.plan_id,
+                "task_count": len(plan.tasks),
+                "tasks": [
+                    {
+                        "task_id": task.task_id,
+                        "dependencies": list(task.dependencies),
+                        "required_tools": list(task.required_tools),
+                    }
+                    for task in plan.tasks
+                ],
+            },
+        )
+        return plan
+
+    def _run_task_graph_worker(
+        self,
+        *,
+        task: WorkerTask,
+        task_context: dict[str, Any],
+        research_context: str,
+        context_block: str | None,
+        worker_tools: list[Any],
+    ) -> str:
+        dependency_results = json.dumps(
+            task_context.get("dependency_results", {}),
+            indent=2,
+            sort_keys=True,
+            default=str,
+        )
+        global_context = json.dumps(
+            task_context.get("global", {}),
+            indent=2,
+            sort_keys=True,
+            default=str,
+        )
+        previous_result = str(task_context.get("previous_result") or "None")
+        qa_feedback = str(task_context.get("qa_feedback") or "None")
+        required_tools = ", ".join(task.required_tools) if task.required_tools else "none"
+
+        description = (
+            "Execute a single atomic task inside the Antigravity task graph.\n\n"
+            f"Task ID: {task.task_id}\n"
+            f"Task Description: {task.description}\n"
+            f"Required Tools: {required_tools}\n\n"
+            f"Dependency Results:\n{dependency_results}\n\n"
+            f"Research Context:\n{research_context}\n\n"
+            f"Runtime Context:\n{context_block or 'No additional runtime context supplied.'}\n\n"
+            f"Global Graph Context:\n{global_context}\n\n"
+            f"Previous Attempt Output:\n{previous_result}\n\n"
+            f"QA Feedback From Prior Attempt:\n{qa_feedback}\n\n"
+            "Rules:\n"
+            "- Return only the concrete output required for this task.\n"
+            "- Do not emit placeholder text, TODO markers, or simulated logic.\n"
+            "- Use the provided tools when the task requires repository interaction.\n"
+        )
+
+        def _runner(llm: LLM) -> str:
+            return self._run_single_agent_task(
+                llm=llm,
+                role="Task Graph Worker",
+                goal="Complete one atomic task with production-grade output only.",
+                backstory=(
+                    "You are an elite staff engineer executing a validated task graph.\n\n"
+                    f"{self._worker_tooling_manifest()}"
+                ),
+                description=description,
+                expected_output="Concrete task-local output only.",
+                tools=worker_tools,
+                max_reasoning_attempts=2,
+            )
+
+        return self._run_stage_with_tier_fallback(
+            stage_name=f"task_execute_{task.task_id}",
+            tier_name="level2",
+            tier=self.models.level2,
+            runner=_runner,
+        )
+
+    def _evaluate_task_graph_worker_output(
+        self,
+        *,
+        task: WorkerTask,
+        candidate_output: str,
+        task_context: dict[str, Any],
+    ) -> str:
+        dependency_results = json.dumps(
+            task_context.get("dependency_results", {}),
+            indent=2,
+            sort_keys=True,
+            default=str,
+        )
+
+        description = (
+            "Evaluate whether the worker output fully satisfies the task.\n\n"
+            f"Task ID: {task.task_id}\n"
+            f"Task Description: {task.description}\n\n"
+            f"Dependency Results:\n{dependency_results}\n\n"
+            f"Worker Output:\n{candidate_output}\n\n"
+            "Reply with exactly one of the following:\n"
+            "- PASS\n"
+            "- FAIL: <specific reason>\n"
+        )
+
+        def _runner(llm: LLM) -> str:
+            return self._run_single_agent_task(
+                llm=llm,
+                role="Task Graph Evaluator",
+                goal="Reject incomplete or malformed task outputs before they reach the graph state.",
+                backstory=(
+                    "You are a strict QA evaluator. You do not repair outputs yourself; "
+                    "you return PASS or a single actionable FAIL reason."
+                ),
+                description=description,
+                expected_output="PASS or FAIL: <reason>",
+            )
+
+        return self._run_stage_with_tier_fallback(
+            stage_name=f"task_evaluate_{task.task_id}",
+            tier_name="level1",
+            tier=self.models.level1,
+            runner=_runner,
+        )
+
+    def _execute_task_graph(
+        self,
+        *,
+        plan: OrchestrationPlan,
+        reconstructed_prompt: str,
+        research_context: str,
+        context_block: str | None,
+    ) -> TaskGraphExecutionSummary:
+        worker_tools = self._build_worker_tools(stage_name="execution_task_graph")
+        worker = ReflexiveTaskWorker(
+            execution_runner=lambda task, task_context: self._run_task_graph_worker(
+                task=task,
+                task_context=task_context,
+                research_context=research_context,
+                context_block=context_block,
+                worker_tools=worker_tools,
+            ),
+            evaluation_runner=lambda task, candidate_output, task_context: self._evaluate_task_graph_worker_output(
+                task=task,
+                candidate_output=candidate_output,
+                task_context=task_context,
+            ),
+            max_retries=3,
+        )
+        executor = DAGTaskExecutor(
+            worker_dispatcher=worker.execute_task,
+            event_sink=self._emit_telemetry,
+        )
+        summary = executor.execute_plan_sync(
+            plan,
+            initial_context={
+                "reconstructed_prompt": reconstructed_prompt,
+                "research_context": research_context,
+            },
+        )
+        self._emit_telemetry(
+            "TASK_GRAPH_COMPLETE",
+            {
+                "execution_mode": summary.execution_mode,
+                "plan_id": summary.plan_id,
+                "parallel_batch_count": summary.parallel_batch_count,
+                "worker_retry_count": summary.worker_retry_count,
+                "task_failure_count": summary.task_failure_count,
+            },
+        )
+        return summary
+
+    def _synthesise_task_graph_output(
+        self,
+        *,
+        plan: OrchestrationPlan,
+        summary: TaskGraphExecutionSummary,
+        reconstructed_prompt: str,
+        research_context: str,
+        context_block: str | None,
+    ) -> str:
+        task_results = json.dumps(
+            {
+                task.task_id: {
+                    "description": task.description,
+                    "result": task.result,
+                }
+                for task in summary.completed_tasks
+            },
+            indent=2,
+            sort_keys=True,
+            default=str,
+        )
+
+        description = (
+            "Synthesize the completed task-graph outputs into the final deliverable.\n\n"
+            f"Plan ID: {plan.plan_id}\n\n"
+            f"Reconstructed Prompt:\n{reconstructed_prompt}\n\n"
+            f"Research Context:\n{research_context}\n\n"
+            f"Runtime Context:\n{context_block or 'No additional runtime context supplied.'}\n\n"
+            f"Completed Task Results:\n{task_results}\n\n"
+            "Requirements:\n"
+            "- Produce the final production-grade answer.\n"
+            "- Preserve exact file paths and full file contents when code is required.\n"
+            "- Do not introduce placeholders or TODO markers.\n"
+        )
+
+        def _runner(llm: LLM) -> str:
+            return self._run_single_agent_task(
+                llm=llm,
+                role="Task Graph Synthesizer",
+                goal="Combine validated task outputs into the final deliverable without losing fidelity.",
+                backstory=(
+                    "You are the orchestration-tier synthesizer. You assemble final output "
+                    "from validated task results and preserve single-source-of-truth semantics."
+                ),
+                description=description,
+                expected_output=(
+                    "A complete deliverable set with exact file paths and full file contents "
+                    "where code or scripts are required."
+                ),
+            )
+
+        return self._run_stage_with_tier_fallback(
+            stage_name="execution_synthesis",
+            tier_name="orchestration",
+            tier=self.models.orchestration,
+            runner=_runner,
+        )
+
     def reconstruct_prompt(self, raw_prompt: str) -> str:
         """
         Executes the Prompt Reconstruction Protocol as a CrewAI task using Level 1 models.
@@ -419,11 +753,86 @@ class CrewAIThreeTierOrchestrator:
         context_block: str | None = None,
     ) -> str:
         """
-        Executes the main 3-tier Crew using a hierarchical process.
-
-        Uses _run_stage_with_tier_fallback for the orchestration tier, composing
-        all three tiers internally via use_fallback propagation.
+        Executes the main runtime using the hardened task-graph path first and
+        falls back to the legacy hierarchical Crew when graph planning fails
+        before any work has started.
         """
+        try:
+            plan = self._plan_execution_graph(
+                source_prompt=self._extract_input_data(reconstructed_prompt),
+                research_context=research_context,
+                context_block=context_block,
+            )
+            summary = self._execute_task_graph(
+                plan=plan,
+                reconstructed_prompt=reconstructed_prompt,
+                research_context=research_context,
+                context_block=context_block,
+            )
+            result = self._synthesise_task_graph_output(
+                plan=plan,
+                summary=summary,
+                reconstructed_prompt=reconstructed_prompt,
+                research_context=research_context,
+                context_block=context_block,
+            )
+            self._emit_telemetry(
+                "EXECUTION_MODE_SELECTED",
+                {
+                    "execution_mode": "task_graph",
+                    "plan_id": plan.plan_id,
+                    "parallel_batch_count": summary.parallel_batch_count,
+                    "worker_retry_count": summary.worker_retry_count,
+                    "task_failure_count": summary.task_failure_count,
+                },
+            )
+        except PlanningFailureError as error:
+            self._emit_telemetry(
+                "EXECUTION_MODE_FALLBACK",
+                {
+                    "from_mode": "task_graph",
+                    "to_mode": "legacy_hierarchical",
+                    "reason": str(error),
+                },
+            )
+            result = self._execute_hierarchical_legacy(
+                reconstructed_prompt=reconstructed_prompt,
+                research_context=research_context,
+                context_block=context_block,
+            )
+        except TaskGraphExecutionError as error:
+            if error.started_execution:
+                raise
+            self._emit_telemetry(
+                "EXECUTION_MODE_FALLBACK",
+                {
+                    "from_mode": "task_graph",
+                    "to_mode": "legacy_hierarchical",
+                    "reason": str(error),
+                },
+            )
+            result = self._execute_hierarchical_legacy(
+                reconstructed_prompt=reconstructed_prompt,
+                research_context=research_context,
+                context_block=context_block,
+            )
+
+        write_workspace_file(self.workspace, ".agent/tmp/final_output.md", result)
+        return result
+
+    def _execute_hierarchical_legacy(
+        self,
+        *,
+        reconstructed_prompt: str,
+        research_context: str,
+        context_block: str | None,
+    ) -> str:
+        self._emit_telemetry(
+            "EXECUTION_MODE_SELECTED",
+            {
+                "execution_mode": "legacy_hierarchical",
+            },
+        )
 
         def _build_crew(self_ref: "CrewAIThreeTierOrchestrator", *, use_fallback: bool) -> str:
             orchestration_llm = (
@@ -464,15 +873,6 @@ class CrewAIThreeTierOrchestrator:
             )
 
             worker_tools = self_ref._build_worker_tools()
-            tooling_manifest = (
-                "Tooling Manifest:\n"
-                "- workspace_file_read/workspace_file_write: read/write files under the active workspace only.\n"
-                "- project_root_file_read/project_root_file_write: read/write only in "
-                ".agent/rules/*, .agent/workflows/*, docs/architecture/*.\n"
-                "- run_tests/run_benchmarks: execute repository verification commands and return machine-readable output.\n"
-                "- read_runtime_configuration/update_runtime_configuration: inspect or safely update runtime config.\n"
-                "- complete_task: emit explicit completion signal with status success|partial|blocked."
-            )
 
             worker = Agent(
                 role="Level 2 Execution/Worker Agent",
@@ -480,7 +880,7 @@ class CrewAIThreeTierOrchestrator:
                 backstory=(
                     "You are an elite staff engineer who produces complete, executable artefacts "
                     "with no TODOs and no simulated logic.\n\n"
-                    f"{tooling_manifest}"
+                    f"{self_ref._worker_tooling_manifest()}"
                 ),
                 llm=level2_llm,
                 verbose=self_ref.verbose,
@@ -545,6 +945,4 @@ class CrewAIThreeTierOrchestrator:
                 _primary_runner(llm) if llm is synthetic_tier.primary else _fallback_runner(llm)
             ),
         )
-
-        write_workspace_file(self.workspace, ".agent/tmp/final_output.md", result)
         return result

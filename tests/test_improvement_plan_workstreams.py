@@ -84,6 +84,10 @@ def test_verification_primitives_validate_javascript_and_shell_syntax():
 def test_context_builder_produces_required_sections(tmp_path):
     workspace = tmp_path / "workspace"
     (workspace / ".agent" / "memory").mkdir(parents=True)
+    (tmp_path / "docs" / "reports").mkdir(parents=True)
+    (tmp_path / "docs" / "benchmarks").mkdir(parents=True)
+    (tmp_path / "docs" / "reports" / "critical_analysis_report.md").write_text("# report\n", encoding="utf-8")
+    (tmp_path / "docs" / "benchmarks" / "latest_results.md").write_text("# bench\n", encoding="utf-8")
     log_file = workspace / ".agent" / "memory" / "execution_log.json"
     log_file.write_text(
         json.dumps(
@@ -113,6 +117,9 @@ def test_context_builder_produces_required_sections(tmp_path):
     assert "strict_provider_validation: True" in context
     assert "max_provider_4xx: 12" in context
     assert "## Recent Execution Activity" in context
+    assert "docs/reports/*" in context
+    assert "critical_analysis_report.md" in context
+    assert "latest_results.md" in context
 
 
 def test_generate_improvement_proposal_reads_nested_pipeline_complete_events(tmp_path):
@@ -157,6 +164,46 @@ def test_generate_improvement_proposal_reads_nested_pipeline_complete_events(tmp
     assert "[RESEARCH] TimeoutError: 1 occurrence(s)" in proposal
     assert "RESEARCH: median 72.4s across 1 samples" in proposal
     assert "Stage 'RESEARCH' timed out in 100% of runs." in proposal
+
+
+def test_generate_improvement_proposal_reads_task_graph_metrics(tmp_path):
+    workspace = tmp_path / "workspace"
+    log_dir = workspace / ".agent" / "memory"
+    log_dir.mkdir(parents=True)
+    (log_dir / "execution_log.json").write_text(
+        json.dumps(
+            {
+                "executions": [
+                    {
+                        "timestamp": "2026-03-07T00:00:00Z",
+                        "run_id": "run-2",
+                        "state": "ORCHESTRATION_L1",
+                        "event": "PIPELINE_COMPLETE",
+                        "details": {
+                            "success": True,
+                            "completion_status": "success",
+                            "failed_stage": None,
+                            "execution_mode": "task_graph",
+                            "plan_id": "plan-123",
+                            "task_count": 3,
+                            "parallel_batch_count": 2,
+                            "worker_retry_count": 2,
+                            "task_failure_count": 0,
+                            "stage_progress": {},
+                        },
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    proposal = generate_improvement_proposal(workspace)
+
+    assert "avg tasks/run 3.0" in proposal
+    assert "avg batches/run 2.0" in proposal
+    assert "avg worker retries/run 2.0" in proposal
+    assert "Workers are retrying 2.0 time(s) per run on average." in proposal
 
 
 def test_project_root_tools_enforce_whitelist(tmp_path):

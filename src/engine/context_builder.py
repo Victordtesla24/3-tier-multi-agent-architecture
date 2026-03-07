@@ -153,6 +153,9 @@ def build_orchestration_context_block(
             project_root / "docs" / "architecture" / "multi-agent-3-level-architecture.md",
             project_root / "docs" / "architecture" / "prompt-reconstruction.md",
             project_root / "docs" / "reports" / "improvement_plan.md",
+            project_root / "docs" / "reports" / "critical_analysis_report.md",
+            project_root / "docs" / "reports" / "Test_Summary_Report.md",
+            project_root / "docs" / "benchmarks" / "latest_results.md",
         ]
     )
     key_subdirs = _existing_paths(
@@ -194,6 +197,9 @@ def build_orchestration_context_block(
     )
     lines.append(
         f"- Notable docs: {', '.join(notable_docs) if notable_docs else 'none detected'}"
+    )
+    lines.append(
+        "- Planning context sources: docs/architecture/*, docs/reports/*, docs/benchmarks/*"
     )
     lines.append("")
     lines.append("## Recent Execution Activity")

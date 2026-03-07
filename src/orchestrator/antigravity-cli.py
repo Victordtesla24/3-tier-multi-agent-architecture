@@ -74,7 +74,7 @@ def _patched_is_file(self: Path) -> bool:
         return False
 
 
-Path.is_file = _patched_is_file
+Path.is_file = _patched_is_file  # type: ignore[method-assign]
 
 
 def main() -> int:
@@ -191,6 +191,12 @@ def main() -> int:
                     "completion_status": result.completion_status,
                     "completion_summary": result.completion_summary,
                     "failed_stage": result.failed_stage,
+                    "execution_mode": result.execution_mode,
+                    "plan_id": result.plan_id,
+                    "task_count": result.task_count,
+                    "parallel_batch_count": result.parallel_batch_count,
+                    "worker_retry_count": result.worker_retry_count,
+                    "task_failure_count": result.task_failure_count,
                     "stage_progress": result.stage_progress,
                     "error": result.error,
                 },
@@ -211,6 +217,9 @@ def main() -> int:
         print(f"- Telemetry log        : {result.execution_log_path}")
         print(f"- Completion status    : {result.completion_status}")
         print(f"- Completion summary   : {result.completion_summary}")
+        print(f"- Execution mode       : {result.execution_mode}")
+        if result.plan_id:
+            print(f"- Plan ID              : {result.plan_id}")
 
         logger.info("Pipeline execution finished.")
         return 0 if result.success else 1

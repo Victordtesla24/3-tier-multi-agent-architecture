@@ -81,10 +81,53 @@ def _compute_stage_latencies(executions: List[Dict[str, Any]]) -> Dict[str, List
     return latencies
 
 
+def _compute_task_graph_metrics(executions: List[Dict[str, Any]]) -> Dict[str, float]:
+    """Aggregate additive task-graph telemetry from normalized pipeline runs."""
+    if not executions:
+        return {
+            "avg_task_count": 0.0,
+            "avg_parallel_batch_count": 0.0,
+            "avg_worker_retry_count": 0.0,
+            "avg_task_failure_count": 0.0,
+            "task_graph_runs": 0.0,
+            "legacy_fallback_runs": 0.0,
+        }
+
+    task_counts: List[float] = []
+    batch_counts: List[float] = []
+    retry_counts: List[float] = []
+    failure_counts: List[float] = []
+    task_graph_runs = 0
+    legacy_fallback_runs = 0
+
+    for item in executions:
+        execution_mode = str(item.get("execution_mode") or "")
+        if execution_mode == "task_graph":
+            task_graph_runs += 1
+        elif execution_mode == "legacy_hierarchical":
+            legacy_fallback_runs += 1
+
+        task_counts.append(float(item.get("task_count", 0) or 0))
+        batch_counts.append(float(item.get("parallel_batch_count", 0) or 0))
+        retry_counts.append(float(item.get("worker_retry_count", 0) or 0))
+        failure_counts.append(float(item.get("task_failure_count", 0) or 0))
+
+    divisor = len(executions)
+    return {
+        "avg_task_count": sum(task_counts) / divisor,
+        "avg_parallel_batch_count": sum(batch_counts) / divisor,
+        "avg_worker_retry_count": sum(retry_counts) / divisor,
+        "avg_task_failure_count": sum(failure_counts) / divisor,
+        "task_graph_runs": float(task_graph_runs),
+        "legacy_fallback_runs": float(legacy_fallback_runs),
+    }
+
+
 def _generate_recommendations(
     failure_modes: Counter,
     latencies: Dict[str, List[float]],
     total_runs: int,
+    task_graph_metrics: Dict[str, float],
 ) -> List[str]:
     """Generate concrete parameter-adjustment recommendations."""
     recommendations: List[str] = []
@@ -135,6 +178,20 @@ def _generate_recommendations(
                     "Consider a lower-effort model for this tier or reducing max_reasoning_attempts."
                 )
 
+    if task_graph_metrics["legacy_fallback_runs"] > 0:
+        fallback_rate = task_graph_metrics["legacy_fallback_runs"] / max(total_runs, 1)
+        if fallback_rate >= 0.25:
+            recommendations.append(
+                f"- Task-graph execution fell back to legacy mode in {fallback_rate:.0%} of runs. "
+                "Review planner prompt quality and plan validation failures before widening rollout."
+            )
+
+    if task_graph_metrics["avg_worker_retry_count"] >= 1:
+        recommendations.append(
+            f"- Workers are retrying {task_graph_metrics['avg_worker_retry_count']:.1f} time(s) per run on average. "
+            "Tighten task descriptions or strengthen evaluator feedback specificity."
+        )
+
     if not recommendations:
         recommendations.append(
             f"- Pipeline is healthy: {total_runs} runs with {failure_rate:.0%} failure rate. "
@@ -157,7 +214,13 @@ def generate_improvement_proposal(workspace: Path) -> str:
     total_runs = len(executions)
     failure_modes = _extract_failure_modes(executions)
     latencies = _compute_stage_latencies(executions)
-    recommendations = _generate_recommendations(failure_modes, latencies, total_runs)
+    task_graph_metrics = _compute_task_graph_metrics(executions)
+    recommendations = _generate_recommendations(
+        failure_modes,
+        latencies,
+        total_runs,
+        task_graph_metrics,
+    )
 
     what_lines = [
         f"- Analyzed {total_runs} recorded pipeline execution(s) in this workspace.",
@@ -174,6 +237,17 @@ def generate_improvement_proposal(workspace: Path) -> str:
         for stage_name, durations in sorted(latencies.items()):
             median_s = statistics.median(durations) if durations else 0
             what_lines.append(f"  - {stage_name}: median {median_s:.1f}s across {len(durations)} samples")
+    if total_runs:
+        what_lines.append(
+            "- Task-graph telemetry summary: "
+            f"avg tasks/run {task_graph_metrics['avg_task_count']:.1f}, "
+            f"avg batches/run {task_graph_metrics['avg_parallel_batch_count']:.1f}, "
+            f"avg worker retries/run {task_graph_metrics['avg_worker_retry_count']:.1f}."
+        )
+        if task_graph_metrics["legacy_fallback_runs"]:
+            what_lines.append(
+                f"- Legacy fallback runs detected: {int(task_graph_metrics['legacy_fallback_runs'])}."
+            )
 
     why_lines = [
         "- Failure-mode clustering reveals recurring bottlenecks that can be addressed "

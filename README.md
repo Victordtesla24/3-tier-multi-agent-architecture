@@ -7,7 +7,7 @@
 
 The Antigravity 3-Tier Multi-Agent Architecture represents a paradigm shift in autonomous, production-grade software engineering and enterprise orchestration. Designed explicitly for organizations operating at scale, this framework leverages advanced large language models (LLMs) coordinated through a deterministic, self-healing pipeline. By integrating the CrewAI orchestration layer with a proprietary tri-level agent hierarchy, the architecture ensures that complex requirements are decomposed, executed, and validated with programmatic precision.
 
-At its core, the solution addresses the persistent challenge of execution reliability within generative AI applications. Traditional single-agent systems frequently falter under the weight of complex, multi-step engineering tasks, often yielding syntactically correct but functionally simulated outputs. The Antigravity framework resolves this through a stringent 1:1 Requirement-to-Instruction mapping protocol and a mathematically rigorous multi-language verification gateway that parses Python and performs syntax checks for JavaScript, TypeScript, and shell fenced blocks. This zero-tolerance policy for simulated code or unverified placeholders guarantees that the output generated is inherently deployment-ready.
+At its core, the solution addresses the persistent challenge of execution reliability within generative AI applications. Traditional single-agent systems frequently falter under the weight of complex, multi-step engineering tasks, often yielding syntactically correct but functionally simulated outputs. The Antigravity framework resolves this through a stringent 1:1 Requirement-to-Instruction mapping protocol, a typed internal task graph with dependency validation and parallel batch scheduling, and a mathematically rigorous multi-language verification gateway that parses Python and performs syntax checks for JavaScript, TypeScript, and shell fenced blocks. This zero-tolerance policy for simulated code or unverified placeholders guarantees that the output generated is inherently deployment-ready.
 
 The key value proposition lies in the convergence of speed, scale, and operational certainty. By transforming the software development lifecycle from a human-bottlenecked process into an autonomous, scalable engine, enterprises can immediately capture unprecedented time-to-market advantages. The architecture not only accelerates development but structurally remediates technical debt in real-time through continuous self-learning mechanisms, aligning directly with the core tenets of modern enterprise digital transformation.
 
@@ -182,7 +182,7 @@ make benchmark
 
 ## 📊 System Architecture & Data Flow
 
-The architecture operates in a strict, sequential hierarchy using CrewAI's `Process.hierarchical` execution, ensuring your prompt is reconstructed, researched, completely executed without simulated placeholders, and logged for continuous learning.
+The architecture keeps CrewAI as the canonical runtime, but the execution layer now hardens the main path with a typed task graph, dependency-aware DAG batching, reflexive worker QA, and a controlled fallback to the legacy hierarchical Crew when planning cannot start safely.
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffffff', 'primaryTextColor': '#333333', 'primaryBorderColor': '#cccccc', 'lineColor': '#0056b3', 'secondaryColor': '#f4f5f7', 'tertiaryColor': '#e1e4e8'}}}%%
@@ -210,11 +210,12 @@ flowchart TD
     %% Pipeline Execution
     ORCHESTRATOR --> RECONSTRUCT["Prompt Reconstruction<br/>Wraps in <input_data>"]:::core
     RECONSTRUCT --> RESEARCH["Research Agent<br/>Fetches verified sources"]:::core
-    RESEARCH --> L1["L1 Crew Manager<br/>Hierarchical Delegation"]:::core
+    RESEARCH --> PLAN["Typed Task Planner<br/>Pydantic ACP + DAG validation"]:::core
+    PLAN --> L1["L1 Crew Manager<br/>Synthesis / Legacy Fallback"]:::core
     
     %% L2 / L3 Delegation
-    L1 --> L2_A["L2 Integration & Execution<br/>MiniMax m2.5 / DeepSeek"]:::worker
-    L1 --> L2_B["L2 Quality Validation<br/>MiniMax m2.5 / DeepSeek"]:::worker
+    PLAN --> L2_A["L2 DAG Batch Execution<br/>MiniMax m2.5 / DeepSeek"]:::worker
+    PLAN --> L2_B["L2 Reflexive Evaluation<br/>GPT-5.2-Codex / MiniMax"]:::worker
     L2_A --> L3_A["L3 Leaf Worker<br/>AST Verification: No placeholders allowed"]:::worker
     L2_B --> L3_B["L3 Leaf Worker<br/>AST Verification: No placeholders allowed"]:::worker
 
@@ -241,6 +242,31 @@ The system is designed to trigger autonomously. You do not need to invoke specif
    - **WHY**: The data-backed reasoning.
    - **HOW**: The expected benefits.
    > **Note:** Explicitly type "Approved" or exactly match the requested authorization constraint to allow the system to apply upgrades.
+
+### Hardened Runtime Details
+
+The primary `execute()` path now performs:
+1. typed task planning with dependency and cycle validation
+2. internal DAG execution in parallelizable batches
+3. reflexive worker evaluation and bounded retry before task results enter shared state
+4. synthesis of validated task outputs into the final deliverable
+5. automatic fallback to the legacy hierarchical Crew only when the task graph cannot begin safely
+
+The CLI and orchestration API remain stable. They now expose additive runtime metadata including `execution_mode`, `plan_id`, `task_count`, `parallel_batch_count`, `worker_retry_count`, and `task_failure_count`.
+
+### Inspectable Workspace Artifacts
+
+The runtime writes shared artifacts under the active workspace so each run can be inspected after execution:
+- `.agent/tmp/`
+  - `reconstructed_prompt.md`
+  - `research-context.md`
+  - `final_output.md`
+- `.agent/memory/`
+  - `execution_log.json`
+  - `crewai_storage/`
+  - `improvement-notes.md` when continuous-learning proposals are approved
+
+These directories are safe to inspect during debugging, benchmarking, and post-run validation.
 
 ---
 

@@ -61,8 +61,10 @@ Execute the architecture upgrades as a deterministic, trackable work program wit
   - Implemented in `src/orchestrator/antigravity-cli.py`.
 - [x] Standardize primary workspace pattern (`<project>/workspaces/...` with env override support).
   - Implemented in CLI defaults.
-- [ ] Treat `docs/reports/*` and `docs/benchmarks/*` as first-class planning context in agent toolchain.
-- [ ] Document `.agent/tmp` and `.agent/memory` as inspectable shared workspace artifacts in architecture/user docs.
+- [x] Treat `docs/reports/*` and `docs/benchmarks/*` as first-class planning context in agent toolchain.
+  - Implemented in `src/engine/context_builder.py` and validated in `tests/test_improvement_plan_workstreams.py`.
+- [x] Document `.agent/tmp` and `.agent/memory` as inspectable shared workspace artifacts in architecture/user docs.
+  - Implemented in `README.md`.
 
 ## Validation Tasks
 - [x] Add tests for new workstream primitives and tooling contracts.
@@ -71,5 +73,5 @@ Execute the architecture upgrades as a deterministic, trackable work program wit
 - [x] Run benchmark harness and attach machine-readable output to reports.
 
 ## Current Execution Notes
-- This pass executed W2/W3/W4 core implementation slices and added contract tests.
-- Remaining backlog is intentionally left as unchecked execution work for subsequent swarm passes.
+- This pass executed the report-driven runtime hardening slice: typed task planning, DAG batch execution, reflexive worker retries, additive telemetry, and documentation/report updates.
+- W6 backlog items are now closed through `src/engine/context_builder.py`, `README.md`, and the expanded validation suite.

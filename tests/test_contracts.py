@@ -197,3 +197,72 @@ def test_execution_loop_snapshot_reports_blocked_stage(tmp_path, monkeypatch):
     assert snapshot["stage_progress"]["PROMPT_RECONSTRUCTION"]["status"] == "completed"
     assert snapshot["stage_progress"]["RESEARCH"]["status"] == "failed"
     assert snapshot["stage_progress"]["RESEARCH"]["duration_s"] is not None
+
+
+def test_execution_loop_metadata_tracks_task_graph_telemetry(tmp_path, monkeypatch):
+    """Telemetry bridge should expose additive task-graph metrics in run metadata."""
+    from engine import state_machine as sm
+
+    class _DummyOrchestrator:
+        def __init__(self, *args, telemetry_hook=None, **kwargs):
+            self.telemetry_hook = telemetry_hook
+
+        def reconstruct_prompt(self, raw_prompt: str) -> str:
+            return f"reconstructed::{raw_prompt}"
+
+        def run_research(self, reconstructed_prompt: str) -> str:
+            return (
+                "## Summary\n"
+                "- synthetic research\n\n"
+                "## Citations[]\n"
+                "- https://example.com/a\n"
+                "- https://example.com/b\n\n"
+                "## MissingConfig[]\n"
+                "- None\n\n"
+                "## RiskNotes[]\n"
+                "- None\n"
+            )
+
+        def execute(self, reconstructed_prompt: str, research_context: str, context_block: str) -> str:
+            assert reconstructed_prompt.startswith("reconstructed::")
+            assert "## Summary" in research_context
+            assert "## Environment Snapshot" in context_block
+            assert self.telemetry_hook is not None
+            self.telemetry_hook(
+                "EXECUTION_PLAN_CREATED",
+                {
+                    "execution_mode": "task_graph",
+                    "plan_id": "plan-123",
+                    "task_count": 2,
+                },
+            )
+            self.telemetry_hook("TASK_GRAPH_BATCH_COMPLETED", {"batch_index": 1})
+            self.telemetry_hook(
+                "TASK_EXECUTION_RESULT",
+                {"task_id": "task_a", "status": "completed", "attempt_count": 2},
+            )
+            self.telemetry_hook(
+                "TASK_GRAPH_COMPLETE",
+                {
+                    "execution_mode": "task_graph",
+                    "plan_id": "plan-123",
+                    "parallel_batch_count": 1,
+                    "worker_retry_count": 1,
+                    "task_failure_count": 0,
+                },
+            )
+            return "final output from task graph"
+
+    monkeypatch.setattr(sm, "CrewAIThreeTierOrchestrator", _DummyOrchestrator)
+    machine = sm.OrchestrationStateMachine(workspace_dir=str(tmp_path))
+    monkeypatch.setattr(machine, "_run_verification_scoring", lambda _results: True)
+
+    success, metadata = machine.execute_pipeline_with_metadata("test prompt")
+
+    assert success is True
+    assert metadata["execution_mode"] == "task_graph"
+    assert metadata["plan_id"] == "plan-123"
+    assert metadata["task_count"] == 2
+    assert metadata["parallel_batch_count"] == 1
+    assert metadata["worker_retry_count"] == 1
+    assert metadata["task_failure_count"] == 0
