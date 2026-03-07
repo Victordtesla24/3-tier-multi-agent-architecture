@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 from pathlib import Path
@@ -45,6 +46,8 @@ from engine.workspace_tools import WorkspaceFileReadTool, WorkspaceFileWriteTool
 # Project root is two levels up from this module (src/engine/ → project root)
 _MODULE_PROJECT_ROOT = Path(__file__).parent.parent.parent.resolve()
 
+_telemetry_logger = logging.getLogger("AntigravityTelemetry")
+
 
 class CrewAIThreeTierOrchestrator:
     """
@@ -87,13 +90,23 @@ class CrewAIThreeTierOrchestrator:
         )
 
     def _emit_telemetry(self, event_type: str, details: dict) -> None:
+        """Emit a telemetry event to the registered hook.
+
+        Telemetry failures are logged at DEBUG level rather than silently
+        swallowed, preserving production debuggability without blocking
+        the pipeline execution path.
+        """
         if self.telemetry_hook is None:
             return
         try:
             self.telemetry_hook(event_type, details)
-        except Exception:
-            # Telemetry should never block execution.
-            return
+        except Exception as exc:
+            _telemetry_logger.debug(
+                "Telemetry emission failed for event '%s': %s: %s",
+                event_type,
+                type(exc).__name__,
+                exc,
+            )
 
     def _llm_identity(self, llm: LLM) -> tuple[str, str]:
         model = str(getattr(llm, "model", "unknown"))

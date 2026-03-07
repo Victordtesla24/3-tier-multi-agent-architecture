@@ -155,7 +155,7 @@ class SemanticTaskPlanner:
         prompt = " ".join(source_prompt.split()).strip()
 
         # Extensible intent registry mapping optimized regex payload to completely compiled Task Graphs
-        intent_registry = [
+        intent_registry: list[dict[str, Any]] = [
             {
                 "pattern": re.compile(r"^fetch weather for (?P<city>[a-zA-Z\s]+) and save to (?P<file>[\w.\-/]+)$", flags=re.IGNORECASE),
                 "plan_builder": lambda match: OrchestrationPlan(
@@ -483,4 +483,29 @@ class DAGTaskExecutor:
         *,
         initial_context: dict[str, Any] | None = None,
     ) -> TaskGraphExecutionSummary:
-        return asyncio.run(self.execute_plan(plan, initial_context=initial_context))
+        """Run the DAG executor synchronously, safely handling pre-existing event loops.
+
+        Uses asyncio.run() when no loop is running. Falls back to a dedicated
+        thread when called from within an active event loop (e.g., Jupyter,
+        async web servers, MCP handlers).
+        """
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop is None:
+            return asyncio.run(
+                self.execute_plan(plan, initial_context=initial_context)
+            )
+
+        import concurrent.futures
+
+        def _run_in_thread() -> TaskGraphExecutionSummary:
+            return asyncio.run(
+                self.execute_plan(plan, initial_context=initial_context)
+            )
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(_run_in_thread)
+            return future.result()

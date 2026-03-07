@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import fnmatch
 import os
 import re
 from dataclasses import dataclass
@@ -114,8 +115,15 @@ def validate_provider_runtime_env(*, strict: bool = True) -> dict[str, str]:
 
 
 def get_provider_policy(model: str) -> ProviderPolicy:
+    """Resolve the most specific provider policy for the given model identifier.
+
+    Supports Unix-style glob patterns in model_pattern (e.g., 'openai/gpt-5*').
+    The wildcard-only pattern '*' is always matched last as the default fallback.
+    """
     for policy in PROVIDER_POLICIES:
-        if policy.model_pattern == "*" or policy.model_pattern == model:
+        if policy.model_pattern == "*":
+            continue
+        if fnmatch.fnmatch(model, policy.model_pattern):
             return policy
     return DEFAULT_PROVIDER_POLICY
 

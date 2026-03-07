@@ -6,10 +6,11 @@ them if semantic drift or placeholder content is detected.
 import hashlib
 import json
 import logging
-import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+
+from engine.verification_primitives import get_banned_marker_registry
 
 logger = logging.getLogger("SemanticHealer")
 
@@ -121,7 +122,7 @@ class ArchitectureHealer:
 
         logger.info(f"Validating semantic integrity: {target_rule_path} (sha256:{checksum})")
 
-        is_valid = self._llm_semantic_check(current_content)
+        is_valid = self._check_content_integrity(current_content)
 
         if not is_valid:
             logger.error(
@@ -139,28 +140,23 @@ class ArchitectureHealer:
         self._write_audit(target_rule_path, action="VALIDATED_OK", reason="no_drift_detected")
         return True
 
-    def _llm_semantic_check(self, content: str) -> bool:
-        """Lexical check for placeholder / drift markers.
+    def _check_content_integrity(self, content: str) -> bool:
+        """Check rule-file content against the canonical banned-marker registry.
 
-        In a fully provisioned environment with API keys, this would call
-        the LLM to evaluate semantic intent. Here we apply the same
-        zero-tolerance lexical gate that the verification scoring uses.
+        Returns True if the content passes all checks (no banned markers found).
         """
-        banned_patterns = [
-            (r"(?im)^\s*(#|//)\s*TODO\b", "TODO comment marker"),
-            (r"(?im)^\s*TODO\b", "TODO marker"),
-            (r"(?im)\bTBD\b", "TBD marker"),
-            (r"(?im)\bFIXME\b", "FIXME marker"),
-            (r"(?im)\braise\s+NotImplementedError\b", "NotImplementedError stub"),
-            (r"(?im)^\s*pass\s*(#.*)?$", "pass-only implementation"),
-            (r"(?im)<\s*placeholder\s*>", "<placeholder> token"),
-            (r"(?im)\{\{\s*.*placeholder.*\}\}", "{{placeholder}} token"),
-        ]
-        for pattern, marker_name in banned_patterns:
-            if re.search(pattern, content):
-                logger.warning(f"Banned marker found: '{marker_name}'")
+        for spec in get_banned_marker_registry():
+            if spec.pattern.search(content):
+                logger.warning(f"Banned marker found: '{spec.label}'")
                 return False
         return True
+
+    def _llm_semantic_check(self, content: str) -> bool:
+        """Backward-compatible alias for _check_content_integrity.
+
+        Delegates to the unified registry-based integrity check.
+        """
+        return self._check_content_integrity(content)
 
     def _regenerate_rule(self, target: Path) -> None:
         """Regenerates a rule file from the canonical built-in template.

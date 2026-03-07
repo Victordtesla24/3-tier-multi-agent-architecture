@@ -9,17 +9,36 @@ from dataclasses import dataclass
 from typing import Literal
 
 
-_BANNED_MARKERS: tuple[tuple[re.Pattern[str], str], ...] = (
-    (re.compile(r"(?im)^\s*(#|//)\s*TODO\b"), "TODO comment marker"),
-    (re.compile(r"(?im)^\s*TODO\b"), "TODO marker"),
-    (re.compile(r"(?im)\bTBD\b"), "TBD marker"),
-    (re.compile(r"(?im)\bFIXME\b"), "FIXME marker"),
-    (re.compile(r"(?im)\braise\s+NotImplementedError\b"), "NotImplementedError stub"),
-    (re.compile(r"(?im)^\s*pass\s*(#.*)?$"), "pass-only implementation"),
-    (re.compile(r"(?im)<\s*placeholder\s*>"), "<placeholder> token"),
-    (re.compile(r"(?im)\{\{\s*.*placeholder.*\}\}"), "{{placeholder}} token"),
-    (re.compile(r"(?im)\bthrow\s+new\s+Error\s*\(\s*['\"]not\s+implemented", flags=0), "JS NotImplemented throw"),
+@dataclass(frozen=True)
+class BannedMarkerSpec:
+    """Single banned-marker rule with compiled regex and human-readable label."""
+    pattern: re.Pattern[str]
+    label: str
+
+
+_BANNED_MARKER_REGISTRY: tuple[BannedMarkerSpec, ...] = (
+    BannedMarkerSpec(re.compile(r"(?im)^\s*(#|//)\s*TODO\b"), "TODO comment marker"),
+    BannedMarkerSpec(re.compile(r"(?im)^\s*TODO\b"), "TODO marker"),
+    BannedMarkerSpec(re.compile(r"(?im)\bTBD\b"), "TBD marker"),
+    BannedMarkerSpec(re.compile(r"(?im)\bFIXME\b"), "FIXME marker"),
+    BannedMarkerSpec(re.compile(r"(?im)\braise\s+NotImplementedError\b"), "NotImplementedError stub"),
+    BannedMarkerSpec(re.compile(r"(?im)^\s*pass\s*(#.*)?$"), "pass-only implementation"),
+    BannedMarkerSpec(re.compile(r"(?im)<\s*placeholder\s*>"), "<placeholder> token"),
+    BannedMarkerSpec(re.compile(r"(?im)\{\{\s*.*placeholder.*\}\}"), "{{placeholder}} token"),
+    BannedMarkerSpec(
+        re.compile(r"(?i)\bthrow\s+new\s+Error\s*\(\s*['\"]not\s+implemented"),
+        "JS NotImplemented throw",
+    ),
 )
+
+
+def get_banned_marker_registry() -> tuple[BannedMarkerSpec, ...]:
+    """Public accessor for the canonical banned-marker registry.
+
+    All modules that need to check for banned markers MUST use this function
+    rather than maintaining a private copy of the patterns.
+    """
+    return _BANNED_MARKER_REGISTRY
 
 CodeLanguage = Literal["python", "javascript", "typescript", "bash", "shell", "sh"]
 
@@ -49,9 +68,9 @@ class CodeBlock:
 def contains_banned_markers(text: str) -> list[str]:
     """Return the list of lexical policy markers detected in the supplied text."""
     hits: list[str] = []
-    for pattern, marker_name in _BANNED_MARKERS:
-        if pattern.search(text):
-            hits.append(marker_name)
+    for spec in _BANNED_MARKER_REGISTRY:
+        if spec.pattern.search(text):
+            hits.append(spec.label)
     return hits
 
 

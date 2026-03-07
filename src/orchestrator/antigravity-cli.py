@@ -62,19 +62,6 @@ class OrchestrationStateMachine:
         return self._impl.execute_pipeline(*args, **kwargs)
 
 
-# Patch pathlib.Path.is_file to bypass macOS Sandbox PermissionError
-# triggered by Pydantic's BaseSettings looking for .env in restricted directories.
-_orig_is_file = Path.is_file
-
-
-def _patched_is_file(self: Path) -> bool:
-    try:
-        return _orig_is_file(self)
-    except PermissionError:
-        return False
-
-
-Path.is_file = _patched_is_file  # type: ignore[method-assign]
 
 
 def main() -> int:
@@ -128,9 +115,12 @@ def main() -> int:
     workspace.mkdir(parents=True, exist_ok=True)
 
     # Bind CrewAI and appdirs storage into the workspace namespace before any CrewAI import.
+    # The sandbox compat patch is scoped strictly to this initialization context.
+    from engine.macos_sandbox_compat import suppress_sandbox_permission_errors
     from engine.crewai_storage import bootstrap_crewai_storage
 
-    bootstrap_crewai_storage(workspace)
+    with suppress_sandbox_permission_errors():
+        bootstrap_crewai_storage(workspace)
 
     from engine.orchestration_api import OrchestrationRunConfig, run_orchestration
     from engine.status_banner import emit_status_banner
