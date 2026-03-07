@@ -2,6 +2,7 @@
 
 import importlib.util
 import sys
+from types import SimpleNamespace
 from pathlib import Path
 
 from engine.logging_utils import redact_sensitive_text
@@ -34,7 +35,28 @@ def test_cli_emits_canonical_status_banner_first_line(tmp_path, monkeypatch, cap
     )
 
     monkeypatch.setattr(module.ArchitectureHealer, "validate_and_heal", lambda *args, **kwargs: True)
-    monkeypatch.setattr(module.OrchestrationStateMachine, "execute_pipeline", lambda *args, **kwargs: True)
+    monkeypatch.setattr(
+        "engine.orchestration_api.run_orchestration",
+        lambda cfg: SimpleNamespace(
+            success=True,
+            workspace=cfg.workspace,
+            prompt=cfg.prompt,
+            strict_provider_validation=cfg.strict_provider_validation,
+            max_provider_4xx=cfg.max_provider_4xx,
+            fail_on_research_empty=cfg.fail_on_research_empty,
+            run_id="test-run-id",
+            execution_log_path=cfg.workspace / ".agent" / "memory" / "execution_log.json",
+            final_output_path=cfg.workspace / ".agent" / "tmp" / "final_output.md",
+            reconstructed_prompt_path=cfg.workspace / ".agent" / "tmp" / "reconstructed_prompt.md",
+            research_context_path=cfg.workspace / ".agent" / "tmp" / "research-context.md",
+            provider_4xx_count=0,
+            completion_status="success",
+            completion_summary="ok",
+            failed_stage=None,
+            stage_progress={},
+            error=None,
+        ),
+    )
 
     exit_code = module.main()
     captured = capsys.readouterr()

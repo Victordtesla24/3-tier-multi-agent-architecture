@@ -97,6 +97,7 @@ def run_orchestration(config: OrchestrationRunConfig) -> OrchestrationRunResult:
     # Execute the state machine pipeline and collect metadata.
     engine = OrchestrationStateMachine(
         workspace_dir=str(workspace),
+        verbose=config.verbose,
         strict_provider_validation=config.strict_provider_validation,
         max_provider_4xx=config.max_provider_4xx,
         fail_on_research_empty=config.fail_on_research_empty,

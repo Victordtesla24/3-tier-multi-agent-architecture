@@ -5,10 +5,9 @@ These tests verify interface contracts between tiers without requiring live API 
 from ast import literal_eval
 
 import pytest
-from pathlib import Path
 from unittest.mock import patch
 
-from crewai import Process, Crew, Agent, Task
+from crewai import Process, Crew, Task
 from engine.crew_orchestrator import CrewAIThreeTierOrchestrator
 from engine.orchestration_tools import CompleteTaskTool, complete_task_signal
 from engine.semantic_healer import ArchitectureHealer

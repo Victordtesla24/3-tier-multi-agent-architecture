@@ -59,6 +59,7 @@ class OrchestrationStateMachine:
         self,
         workspace_dir: str,
         *,
+        verbose: bool = False,
         strict_provider_validation: bool = True,
         max_provider_4xx: int = 50,
         fail_on_research_empty: bool = False,
@@ -66,6 +67,7 @@ class OrchestrationStateMachine:
         self.workspace = workspace_dir
         self.state = "INIT"
         self.max_retries = 3
+        self.verbose = verbose
         self.strict_provider_validation = strict_provider_validation
         self.max_provider_4xx = max_provider_4xx
         self.fail_on_research_empty = fail_on_research_empty
@@ -272,7 +274,7 @@ class OrchestrationStateMachine:
 
             orchestrator = CrewAIThreeTierOrchestrator(
                 workspace_dir=self.workspace,
-                verbose=True,
+                verbose=self.verbose,
                 strict_provider_validation=self.strict_provider_validation,
                 run_id=self.run_id,
                 telemetry_hook=self._record_orchestrator_event,

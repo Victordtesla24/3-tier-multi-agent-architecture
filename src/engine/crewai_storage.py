@@ -12,8 +12,8 @@ Call `bootstrap_crewai_storage(workspace)` *before* importing any modules that
 initialise CrewAI or ChromaDB to avoid writes to user-level directories.
 """
 
-import os
-from pathlib import Path
+import os  # noqa: E402
+from pathlib import Path  # noqa: E402
 
 
 def bootstrap_crewai_storage(workspace: str | Path) -> Path:
@@ -27,8 +27,9 @@ def bootstrap_crewai_storage(workspace: str | Path) -> Path:
     storage_dir.mkdir(parents=True, exist_ok=True)
 
     # Environment variables recognised by CrewAI for persistent storage.
-    os.environ.setdefault("CREWAI_STORAGE_DIR", str(storage_dir))
-    os.environ.setdefault("CREWAI_HOME", str(storage_dir))
+    # Always rebind so each workspace run remains isolated in long-lived processes.
+    os.environ["CREWAI_STORAGE_DIR"] = str(storage_dir)
+    os.environ["CREWAI_HOME"] = str(storage_dir)
 
     try:
         import appdirs  # type: ignore
@@ -51,4 +52,3 @@ def bootstrap_crewai_storage(workspace: str | Path) -> Path:
     appdirs.user_data_dir = _patched_user_data_dir  # type: ignore[attr-defined]
 
     return storage_dir
-

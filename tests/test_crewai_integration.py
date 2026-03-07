@@ -21,7 +21,7 @@ class TestModuleImports:
     """Verify all new modules import without errors."""
 
     def test_import_llm_providers(self):
-        from engine.llm_providers import LLMProvider, ThinkingEffort
+        from engine.llm_providers import LLMProvider
         assert hasattr(LLMProvider, "get_orchestration_llm")
         assert hasattr(LLMProvider, "get_l1_llm")
         assert hasattr(LLMProvider, "get_l2_llm")
@@ -38,10 +38,7 @@ class TestModuleImports:
 
     def test_import_llm_config(self):
         from engine.llm_config import (
-            Effort, ModelSpec, ModelTier, EnvConfigError,
-            ModelMatrix, build_model_matrix, build_llm,
-            ProviderPolicy, classify_provider_error,
-            load_workspace_env, require_env, normalise_base_url,
+            Effort, ModelTier, ProviderPolicy, classify_provider_error,
             validate_provider_runtime_env,
         )
         assert Effort.LOW.value == "low"

@@ -159,8 +159,11 @@ class CrewAIThreeTierOrchestrator:
             ProjectRootFileWriteTool(project_root=str(_MODULE_PROJECT_ROOT)),
             RunTestsTool(project_root=str(_MODULE_PROJECT_ROOT)),
             RunBenchmarksTool(project_root=str(_MODULE_PROJECT_ROOT)),
-            ReadRuntimeConfigTool(project_root=str(_MODULE_PROJECT_ROOT)),
-            UpdateRuntimeConfigTool(),
+            ReadRuntimeConfigTool(
+                project_root=str(_MODULE_PROJECT_ROOT),
+                workspace=str(self.workspace),
+            ),
+            UpdateRuntimeConfigTool(workspace=str(self.workspace)),
             CompleteTaskTool(),
         ]
         self._emit_telemetry(

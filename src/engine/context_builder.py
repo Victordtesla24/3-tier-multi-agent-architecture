@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from collections import Counter
 from pathlib import Path
@@ -19,6 +20,24 @@ _LANGUAGE_BY_SUFFIX = {
     ".toml": "TOML",
     ".sh": "Shell",
     ".dockerfile": "Dockerfile",
+}
+
+_SCAN_EXCLUDED_DIRS = {
+    ".git",
+    ".agent",
+    ".venv",
+    "venv",
+    "node_modules",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    "__pycache__",
+    ".tox",
+    ".idea",
+    ".vscode",
+    "build",
+    "dist",
+    "workspaces",
 }
 
 
@@ -40,20 +59,21 @@ def _detect_primary_languages(project_root: Path, limit: int = 5000) -> list[str
     counts: Counter[str] = Counter()
     scanned = 0
 
-    for path in project_root.rglob("*"):
+    for root, dirs, files in os.walk(project_root):
+        dirs[:] = [directory for directory in dirs if directory not in _SCAN_EXCLUDED_DIRS]
+        for file_name in files:
+            if scanned >= limit:
+                break
+            path = Path(root) / file_name
+            suffix = path.suffix.lower()
+            language = _LANGUAGE_BY_SUFFIX.get(suffix)
+            if language is None and path.name.lower() == "dockerfile":
+                language = "Dockerfile"
+            if language:
+                counts[language] += 1
+            scanned += 1
         if scanned >= limit:
             break
-        if not path.is_file():
-            continue
-        if ".git" in path.parts:
-            continue
-        suffix = path.suffix.lower()
-        language = _LANGUAGE_BY_SUFFIX.get(suffix)
-        if language is None and path.name.lower() == "dockerfile":
-            language = "Dockerfile"
-        if language:
-            counts[language] += 1
-        scanned += 1
 
     return [name for name, _count in counts.most_common(4)]
 

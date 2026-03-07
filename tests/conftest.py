@@ -1,6 +1,5 @@
 """Pytest configuration — redirect CrewAI and appdirs storage before any imports."""
 import os
-import sys
 
 # CrewAI's db_storage_path() runs at module-load time (class default param) and calls
 # appdirs.user_data_dir() which on macOS resolves to ~/Library/Application Support/.

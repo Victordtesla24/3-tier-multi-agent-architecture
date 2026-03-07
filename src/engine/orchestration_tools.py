@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import shlex
 import subprocess
 import sys
 import time
@@ -192,20 +191,19 @@ def update_runtime_configuration(
     }
 
 
-class _CommandArgs(BaseModel):
-    command: str | None = Field(
-        default=None,
-        description="Optional shell-style command override. Example: `pytest tests -q`.",
-    )
+class _RunTestsArgs(BaseModel):
     timeout_seconds: int = Field(default=1800, description="Command timeout in seconds.")
 
 
+class _RunBenchmarksArgs(BaseModel):
+    timeout_seconds: int = Field(default=3600, description="Command timeout in seconds.")
+
+
 class _ReadConfigArgs(BaseModel):
-    workspace: str = Field(..., description="Absolute workspace path.")
+    pass
 
 
 class _UpdateConfigArgs(BaseModel):
-    workspace: str = Field(..., description="Absolute workspace path.")
     updates: dict[str, str] = Field(
         ...,
         description="Environment key/value updates for workspace .env.",
@@ -226,14 +224,12 @@ class RunTestsTool(BaseTool):
         "Run the repository's automated tests and return machine-readable output. "
         "This tool only executes test commands; it does not select models or alter LLM behaviour."
     )
-    args_schema: Type[BaseModel] = _CommandArgs
+    args_schema: Type[BaseModel] = _RunTestsArgs
     project_root: str = Field(..., description="Absolute project root path.")
 
-    def _run(self, command: str | None = None, timeout_seconds: int = 1800) -> str:
-        command_list = shlex.split(command) if command else None
+    def _run(self, timeout_seconds: int = 1800) -> str:
         result = run_tests(
             project_root=Path(self.project_root),
-            command=command_list,
             timeout_seconds=timeout_seconds,
         )
         return str(result)
@@ -245,14 +241,12 @@ class RunBenchmarksTool(BaseTool):
         "Run the benchmark harness and return machine-readable output. "
         "This tool only executes benchmark commands; it does not select models or alter LLM behaviour."
     )
-    args_schema: Type[BaseModel] = _CommandArgs
+    args_schema: Type[BaseModel] = _RunBenchmarksArgs
     project_root: str = Field(..., description="Absolute project root path.")
 
-    def _run(self, command: str | None = None, timeout_seconds: int = 3600) -> str:
-        command_list = shlex.split(command) if command else None
+    def _run(self, timeout_seconds: int = 3600) -> str:
         result = run_benchmarks(
             project_root=Path(self.project_root),
-            command=command_list,
             timeout_seconds=timeout_seconds,
         )
         return str(result)
@@ -278,15 +272,17 @@ class ReadRuntimeConfigTool(BaseTool):
     name: str = "read_runtime_configuration"
     description: str = (
         "Inspect effective runtime configuration: key presence and related env/.env paths. "
-        "This tool only reports configuration; it does not modify or interpret model policy."
+        "This tool only reports configuration for the active workspace; "
+        "it does not modify or interpret model policy."
     )
     args_schema: Type[BaseModel] = _ReadConfigArgs
     project_root: str = Field(..., description="Absolute project root path.")
+    workspace: str = Field(..., description="Absolute active workspace path.")
 
-    def _run(self, workspace: str) -> str:
+    def _run(self) -> str:
         result = read_runtime_configuration(
             project_root=Path(self.project_root),
-            workspace=Path(workspace),
+            workspace=Path(self.workspace),
         )
         return str(result)
 
@@ -294,14 +290,15 @@ class ReadRuntimeConfigTool(BaseTool):
 class UpdateRuntimeConfigTool(BaseTool):
     name: str = "update_runtime_configuration"
     description: str = (
-        "Update allowed runtime configuration keys in a workspace .env file. "
+        "Update allowed runtime configuration keys in the active workspace .env file. "
         "This tool only edits environment variables; higher-level prompts decide how to use them."
     )
     args_schema: Type[BaseModel] = _UpdateConfigArgs
+    workspace: str = Field(..., description="Absolute active workspace path.")
 
-    def _run(self, workspace: str, updates: dict[str, str]) -> str:
+    def _run(self, updates: dict[str, str]) -> str:
         result = update_runtime_configuration(
-            workspace=Path(workspace),
+            workspace=Path(self.workspace),
             updates=updates,
         )
         return str(result)

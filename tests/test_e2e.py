@@ -76,9 +76,9 @@ def test_simulated_llm_failure_injection(mock_workspace):
 def test_memory_telemetry_validation(mock_workspace):
     """Memory/telemetry validation for Continuous Learning proposals."""
     from engine.state_machine import OrchestrationStateMachine
-    
+
     # Initialize the state machine which creates the telemetry file
-    machine = OrchestrationStateMachine(workspace_dir=mock_workspace)
+    _ = OrchestrationStateMachine(workspace_dir=mock_workspace)
     
     memory_dir = Path(mock_workspace) / ".agent" / "memory"
     log_file = memory_dir / "execution_log.json"

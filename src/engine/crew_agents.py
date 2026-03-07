@@ -1,8 +1,6 @@
 """3-Tier Agent Hierarchy using CrewAI Framework"""
-from crewai import Agent, Task, Crew, Process
+from crewai import Agent
 from engine.llm_providers import LLMProvider
-from typing import List, Dict, Any
-import json
 
 
 class L3LeafWorkerAgent:

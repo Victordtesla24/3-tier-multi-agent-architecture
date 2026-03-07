@@ -132,12 +132,10 @@ def main() -> int:
 
     bootstrap_crewai_storage(workspace)
 
-    from engine.llm_config import EnvConfigError, load_workspace_env, validate_provider_runtime_env
     from engine.orchestration_api import OrchestrationRunConfig, run_orchestration
     from engine.status_banner import emit_status_banner
 
     emit_status_banner()
-    print("3-tier-multi-agent-architecture Status: ON 🟢")
     print("🌌 Antigravity 3-Tier Multi-Agent Architecture + CrewAI")
     print(f"📁 Workspace : {workspace}")
     print(f"📁 Project   : {PROJECT_ROOT}")
