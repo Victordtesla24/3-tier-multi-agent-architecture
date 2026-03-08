@@ -1,11 +1,18 @@
 # Environments
 .env
+.continue/
+.clinerules/
+.codellm/
+.cursor/
+.cursorrules
 .venv
 venv/
 ENV/
+compound-engineering.local.md
 env/
 
 # Python
+.mypy_cache/
 __pycache__/
 *.py[cod]
 *$py.class
@@ -57,6 +64,12 @@ Icon
 # Project specific
 .agent/tmp/
 .agent/memory/
+
+# Generated local tool and runtime artifacts
+.gemini/
+node_modules/
+tmp/
+workspaces/
 
 # Generated benchmark output
 docs/benchmarks/latest_results.json

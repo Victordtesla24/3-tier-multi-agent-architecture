@@ -4,11 +4,17 @@ import os
 import subprocess
 import sys
 import time
+import json
 from pathlib import Path
 from typing import Any, Literal, Mapping, Type
 
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
+from view.a2ui_protocol import (
+    ACK_ACTION_ID,
+    acknowledgement_visibility_path,
+    apply_acknowledgement_update,
+)
 
 
 def _default_test_command(project_root: Path) -> list[str]:
@@ -134,6 +140,7 @@ def read_runtime_configuration(
     *,
     project_root: Path,
     workspace: Path,
+    include_system_env: bool = False,
 ) -> dict[str, Any]:
     workspace = workspace.resolve()
     project_root = project_root.resolve()
@@ -148,7 +155,7 @@ def read_runtime_configuration(
         for key in _RUNTIME_KEYS
     }
 
-    return {
+    payload: dict[str, Any] = {
         "project_root": str(project_root),
         "workspace": str(workspace),
         "workspace_env_path": str(workspace_env),
@@ -157,6 +164,13 @@ def read_runtime_configuration(
         "project_env_exists": project_env.exists(),
         "env_status": env_status,
     }
+    if include_system_env:
+        payload["system_env"] = {
+            key: os.environ.get(key)
+            for key in _RUNTIME_KEYS
+            if os.environ.get(key) is not None
+        }
+    return payload
 
 
 def _parse_dotenv(path: Path) -> dict[str, str]:
@@ -202,6 +216,92 @@ def update_runtime_configuration(
     }
 
 
+def acknowledge_ui_action(
+    *,
+    workspace: Path,
+    action_id: str = ACK_ACTION_ID,
+    acknowledged: bool = True,
+) -> dict[str, Any]:
+    """
+    Primitive shared-state mutation for UI acknowledgements.
+    The same pointer path is used by A2UI payload generation and agent tools.
+    """
+    workspace = workspace.resolve()
+    state_file = workspace / ".agent" / "memory" / "a2ui_state.json"
+    if state_file.exists():
+        try:
+            payload = json.loads(state_file.read_text(encoding="utf-8"))
+        except Exception:
+            payload = {}
+    else:
+        payload = {}
+
+    data_model = payload.get("data_model", {})
+    if not isinstance(data_model, dict):
+        data_model = {}
+
+    updated_data_model = apply_acknowledgement_update(
+        data_model,
+        action_id=action_id,
+        acknowledged=acknowledged,
+    )
+    pointer = acknowledgement_visibility_path(action_id)
+    payload["data_model"] = updated_data_model
+    payload["last_action"] = {
+        "action_id": action_id,
+        "acknowledged": acknowledged,
+        "shared_state_path": pointer,
+    }
+    state_file.parent.mkdir(parents=True, exist_ok=True)
+    state_file.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    return {
+        "workspace": str(workspace),
+        "action_id": action_id,
+        "acknowledged": acknowledged,
+        "shared_state_path": pointer,
+        "visibility": bool(updated_data_model.get(pointer)),
+        "state_file": str(state_file),
+    }
+
+
+def submit_objective(
+    *,
+    prompt: str,
+    workspace: Path,
+    strict_provider_validation: bool = True,
+    max_provider_4xx: int = 50,
+    fail_on_research_empty: bool = False,
+    verbose: bool = False,
+) -> dict[str, Any]:
+    """Programmatic equivalent of CLI objective submission."""
+    from engine.orchestration_api import OrchestrationRunConfig, run_orchestration
+
+    cfg = OrchestrationRunConfig(
+        prompt=prompt,
+        workspace=workspace.resolve(),
+        strict_provider_validation=strict_provider_validation,
+        max_provider_4xx=max_provider_4xx,
+        fail_on_research_empty=fail_on_research_empty,
+        verbose=verbose,
+        caller="internal",
+    )
+    result = run_orchestration(cfg)
+    return {
+        "success": result.success,
+        "workspace": str(result.workspace),
+        "run_id": result.run_id,
+        "completion_status": result.completion_status,
+        "completion_summary": result.completion_summary,
+        "final_output_path": str(result.final_output_path),
+        "reconstructed_prompt_path": str(result.reconstructed_prompt_path),
+        "research_context_path": str(result.research_context_path),
+        "execution_log_path": str(result.execution_log_path),
+        "failed_stage": result.failed_stage,
+        "error": result.error,
+    }
+
+
 class _RunTestsArgs(BaseModel):
     timeout_seconds: int = Field(default=1800, description="Command timeout in seconds.")
 
@@ -232,6 +332,37 @@ class _CompleteTaskArgs(BaseModel):
     status: Literal["success", "partial", "blocked"] = Field(
         default="success",
         description="Completion status for the current objective.",
+    )
+
+
+class _AcknowledgeUIActionArgs(BaseModel):
+    action_id: str = Field(
+        default=ACK_ACTION_ID,
+        description="A2UI action identifier to acknowledge.",
+    )
+    acknowledged: bool = Field(
+        default=True,
+        description="Whether the action has been acknowledged.",
+    )
+
+
+class _SubmitObjectiveArgs(BaseModel):
+    prompt: str = Field(..., description="Objective/prompt to submit for orchestration.")
+    strict_provider_validation: bool = Field(
+        default=True,
+        description="Fail fast when provider runtime configuration is invalid.",
+    )
+    max_provider_4xx: int = Field(
+        default=50,
+        description="Maximum tolerated provider HTTP 4xx events before abort.",
+    )
+    fail_on_research_empty: bool = Field(
+        default=False,
+        description="Fail if research context has fewer than two citations for non-trivial prompts.",
+    )
+    verbose: bool = Field(
+        default=False,
+        description="Enable verbose model execution output.",
     )
 
 
@@ -296,10 +427,11 @@ class ReadRuntimeConfigTool(BaseTool):
     project_root: str = Field(..., description="Absolute project root path.")
     workspace: str = Field(..., description="Absolute active workspace path.")
 
-    def _run(self) -> str:
+    def _run(self, include_system_env: bool = False) -> str:
         result = read_runtime_configuration(
             project_root=Path(self.project_root),
             workspace=Path(self.workspace),
+            include_system_env=include_system_env,
         )
         return str(result)
 
@@ -317,5 +449,51 @@ class UpdateRuntimeConfigTool(BaseTool):
         result = update_runtime_configuration(
             workspace=Path(self.workspace),
             updates=updates,
+        )
+        return str(result)
+
+
+class AcknowledgeUIActionTool(BaseTool):
+    name: str = "acknowledge_ui_action"
+    description: str = (
+        "Acknowledge an A2UI action by mutating shared state at the canonical pointer path. "
+        "This keeps agent and UI acknowledgement behavior in parity."
+    )
+    args_schema: Type[BaseModel] = _AcknowledgeUIActionArgs
+    workspace: str = Field(..., description="Absolute active workspace path.")
+
+    def _run(self, action_id: str = ACK_ACTION_ID, acknowledged: bool = True) -> str:
+        result = acknowledge_ui_action(
+            workspace=Path(self.workspace),
+            action_id=action_id,
+            acknowledged=acknowledged,
+        )
+        return str(result)
+
+
+class SubmitObjectiveTool(BaseTool):
+    name: str = "submit_objective"
+    description: str = (
+        "Submit a new objective/prompt into the orchestration pipeline. "
+        "This is the agent equivalent of the CLI --prompt submission path."
+    )
+    args_schema: Type[BaseModel] = _SubmitObjectiveArgs
+    workspace: str = Field(..., description="Absolute active workspace path.")
+
+    def _run(
+        self,
+        prompt: str,
+        strict_provider_validation: bool = True,
+        max_provider_4xx: int = 50,
+        fail_on_research_empty: bool = False,
+        verbose: bool = False,
+    ) -> str:
+        result = submit_objective(
+            prompt=prompt,
+            workspace=Path(self.workspace),
+            strict_provider_validation=strict_provider_validation,
+            max_provider_4xx=max_provider_4xx,
+            fail_on_research_empty=fail_on_research_empty,
+            verbose=verbose,
         )
         return str(result)

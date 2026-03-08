@@ -263,8 +263,11 @@ class SubmitPromptResponse:
 
 def _default_workspace() -> Path:
     root = _project_root()
-    base = Path(os.environ.get("ANTIGRAVITY_WORKSPACE_ROOT", root / "workspaces"))  # type: ignore[name-defined]
-    return (base / "api-default").resolve()
+    explicit_workspace = os.environ.get("ANTIGRAVITY_WORKSPACE_DIR")
+    if explicit_workspace:
+        return Path(explicit_workspace).resolve()
+    base = Path(os.environ.get("ANTIGRAVITY_WORKSPACE_ROOT", root))  # type: ignore[name-defined]
+    return base.resolve()
 
 
 def submit_prompt(request: SubmitPromptRequest) -> SubmitPromptResponse:

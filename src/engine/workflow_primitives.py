@@ -41,6 +41,14 @@ _INPUT_DATA_PATTERN = re.compile(
     r"<input_data>(.*?)</input_data>",
     flags=re.DOTALL | re.IGNORECASE,
 )
+_MARKDOWN_WRAPPED_INPUT_DATA_PATTERN = re.compile(
+    r"`\s*<input_data>\s*`\s*(.*?)\s*`\s*</input_data>\s*`",
+    flags=re.DOTALL | re.IGNORECASE,
+)
+_MARKDOWN_INPUT_DATA_PATTERN = re.compile(
+    r"^##\s*Input Data\s*$\s*^```[^\n]*\n(.*?)^```",
+    flags=re.DOTALL | re.IGNORECASE | re.MULTILINE,
+)
 
 
 def sanitize_user_input(raw_prompt: str) -> str:
@@ -49,7 +57,14 @@ def sanitize_user_input(raw_prompt: str) -> str:
     prompt-injection and script payload patterns.
     """
     match = _INPUT_DATA_PATTERN.search(raw_prompt)
+    if match is None:
+        match = _MARKDOWN_WRAPPED_INPUT_DATA_PATTERN.search(raw_prompt)
+    if match is None:
+        match = _MARKDOWN_INPUT_DATA_PATTERN.search(raw_prompt)
     payload = match.group(1).strip() if match else raw_prompt.strip()
+    # Normalize wrapped input_data variants (including backticked tag lines).
+    payload = re.sub(r"(?im)^\s*`+\s*$", "", payload)
+    payload = re.sub(r"(?im)^\s*`?\s*</?input_data>\s*`?\s*$", "", payload)
 
     sanitized = _SANITIZE_INJECTION_PATTERN.sub("[REDACTED]", payload)
     sanitized = _SANITIZE_SCRIPT_PATTERN.sub("[REMOVED SCRIPT]", sanitized)
@@ -140,4 +155,3 @@ def write_workspace_file(
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(content, encoding=encoding)
     return target
-

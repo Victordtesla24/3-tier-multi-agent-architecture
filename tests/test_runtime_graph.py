@@ -8,6 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from engine.crew_orchestrator import CrewAIThreeTierOrchestrator
+from engine.project_root_tools import ProjectRootFileReadTool
 from engine.runtime_graph import (
     DAGTaskExecutor,
     OrchestrationPlan,
@@ -19,6 +20,7 @@ from engine.runtime_graph import (
     TaskStatus,
     WorkerTask,
 )
+from engine.workflow_primitives import sanitize_user_input
 
 
 @pytest.fixture(autouse=True)
@@ -79,6 +81,74 @@ def test_semantic_task_planner_fast_path_weather():
     assert plan.tasks[1].dependencies == ["fetch_weather"]
 
 
+def test_semantic_task_planner_fast_path_prompt_rewrite():
+    planner = SemanticTaskPlanner(llm_planner=lambda _prompt: "")
+    plan = planner.create_plan(
+        source_prompt=(
+            "Rewrite this request into a production-grade prompt: "
+            "Draft a concise customer onboarding email for a B2B SaaS product."
+        ),
+        research_context="unused",
+    )
+
+    assert plan.tasks[0].task_id == "rewrite_prompt"
+    assert "production-grade prompt" in plan.tasks[0].description
+    assert "Do not return a prompt-engineering framework" in plan.tasks[0].description
+    assert (
+        plan.global_context["input_data"]
+        == "Draft a concise customer onboarding email for a B2B SaaS product."
+    )
+
+
+def test_semantic_task_planner_fast_path_prompt_rewrite_from_wrapped_prompt():
+    planner = SemanticTaskPlanner(llm_planner=lambda _prompt: "")
+    plan = planner.create_plan(
+        source_prompt="""```markdown
+# Prompt Wrapper
+
+## Input Data
+`<input_data>`
+Rewrite this request into a production-grade prompt: Draft a concise customer onboarding email for a B2B SaaS product.
+`</input_data>`
+```""",
+        research_context="unused",
+    )
+
+    assert plan.tasks[0].task_id == "rewrite_prompt"
+    assert plan.global_context["input_data"] == (
+        "Draft a concise customer onboarding email for a B2B SaaS product."
+    )
+
+
+def test_sanitize_user_input_extracts_markdown_input_data_block():
+    raw_prompt = """```markdown
+# Prompt Wrapper
+
+## Input Data
+```
+Rewrite this request into a production-grade prompt: Draft a concise customer onboarding email for a B2B SaaS product.
+```
+```"""
+
+    assert sanitize_user_input(raw_prompt) == (
+        "Rewrite this request into a production-grade prompt: "
+        "Draft a concise customer onboarding email for a B2B SaaS product."
+    )
+
+
+def test_sanitize_user_input_extracts_backticked_input_data_tags():
+    raw_prompt = """## Input Data
+`<input_data>`
+Rewrite this request into a production-grade prompt: Draft a concise customer onboarding email for a B2B SaaS product.
+`</input_data>`
+"""
+
+    assert sanitize_user_input(raw_prompt) == (
+        "Rewrite this request into a production-grade prompt: "
+        "Draft a concise customer onboarding email for a B2B SaaS product."
+    )
+
+
 def test_semantic_task_planner_cleans_json_fences():
     planner = SemanticTaskPlanner(
         llm_planner=lambda _prompt: """```json
@@ -109,6 +179,20 @@ def test_semantic_task_planner_rejects_malformed_json():
 
     with pytest.raises(PlanningFailureError, match="JSON object"):
         planner.create_plan(source_prompt="ship feature", research_context="unused")
+
+
+def test_project_root_tool_reads_reports_and_benchmarks(tmp_path):
+    report_path = tmp_path / "docs" / "reports" / "summary.md"
+    benchmark_path = tmp_path / "docs" / "benchmarks" / "latest_results.md"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    benchmark_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text("report-ok", encoding="utf-8")
+    benchmark_path.write_text("benchmark-ok", encoding="utf-8")
+
+    reader = ProjectRootFileReadTool(project_root=str(tmp_path))
+
+    assert reader._run("docs/reports/summary.md") == "report-ok"
+    assert reader._run("docs/benchmarks/latest_results.md") == "benchmark-ok"
 
 
 def test_dag_executor_runs_parallel_batches():
@@ -350,6 +434,65 @@ def test_execute_prefers_task_graph_path_and_writes_final_output(tmp_path, monke
 
     assert result == "task graph result"
     assert (tmp_path / ".agent" / "tmp" / "final_output.md").read_text(encoding="utf-8") == "task graph result"
+
+
+def test_task_graph_worker_normalizes_generic_read_tools_and_reroutes_off_ollama(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr("engine.crew_orchestrator._MODULE_PROJECT_ROOT", tmp_path)
+    orchestrator = CrewAIThreeTierOrchestrator(workspace_dir=str(tmp_path), verbose=False)
+    worker_tools = orchestrator._build_worker_tools()
+    task = WorkerTask(
+        task_id="collect_architecture_inputs",
+        description="Load docs/architecture/* and docs/reports/* sources.",
+        required_tools=["filesystem_read"],
+    )
+
+    selected_tools = orchestrator._select_worker_tools_for_task(
+        task=task,
+        worker_tools=worker_tools,
+    )
+    selected_names = [tool.name for tool in selected_tools]
+    execution_tier = orchestrator._select_task_graph_worker_tier(
+        worker_tools=selected_tools,
+    )
+
+    assert selected_names == ["project_root_file_read", "workspace_file_read"]
+    assert not str(getattr(execution_tier.primary, "model", "")).startswith("ollama/")
+
+
+def test_task_graph_worker_keeps_l3_tier_for_toolless_tasks(tmp_path, monkeypatch):
+    monkeypatch.setattr("engine.crew_orchestrator._MODULE_PROJECT_ROOT", tmp_path)
+    orchestrator = CrewAIThreeTierOrchestrator(workspace_dir=str(tmp_path), verbose=False)
+
+    execution_tier = orchestrator._select_task_graph_worker_tier(worker_tools=[])
+
+    assert execution_tier is orchestrator.models.level3
+
+
+def test_task_graph_worker_uses_minimal_default_tools_when_required_tools_missing(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr("engine.crew_orchestrator._MODULE_PROJECT_ROOT", tmp_path)
+    orchestrator = CrewAIThreeTierOrchestrator(workspace_dir=str(tmp_path), verbose=False)
+    worker_tools = orchestrator._build_worker_tools()
+    task = WorkerTask(
+        task_id="tooling_fallback",
+        description="Run with omitted required_tools.",
+        required_tools=[],
+    )
+
+    selected_tools = orchestrator._select_worker_tools_for_task(
+        task=task,
+        worker_tools=worker_tools,
+    )
+    selected_names = [tool.name for tool in selected_tools]
+
+    assert selected_names == [
+        "workspace_file_read",
+        "workspace_file_write",
+        "complete_task",
+    ]
 
 
 def test_execute_falls_back_to_legacy_when_planning_fails(tmp_path, monkeypatch):

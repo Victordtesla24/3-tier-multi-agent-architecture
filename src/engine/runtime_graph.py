@@ -174,12 +174,51 @@ class SemanticTaskPlanner:
                         ),
                     ],
                 )
+            },
+            {
+                "pattern": re.compile(
+                    r"rewrite this request into a production-grade prompt:\s*"
+                    r"(?P<input_data>.*?)(?:\s*`?\s*</input_data>\s*`?)?$",
+                    flags=re.IGNORECASE | re.DOTALL,
+                ),
+                "matcher": "search",
+                "plan_builder": lambda match: OrchestrationPlan(
+                    original_query=prompt,
+                    tasks=[
+                        WorkerTask(
+                            task_id="rewrite_prompt",
+                            description=(
+                                "Rewrite the provided input_data into a production-grade prompt that can "
+                                "be handed directly to another AI model. Return only that final prompt "
+                                "inside a Markdown fenced code block. Do not return a prompt-engineering "
+                                "framework, meta system-prompt template with section headings, or the "
+                                "downstream business content described by the prompt."
+                            ),
+                        ),
+                    ],
+                    global_context={
+                        "input_data": re.sub(
+                            r"\s*`?\s*</input_data>\s*`?\s*$",
+                            "",
+                            re.sub(
+                                r"\s*```+\s*$",
+                                "",
+                                match.group("input_data").strip(),
+                            ),
+                            flags=re.IGNORECASE,
+                        ).strip().strip("`").strip(),
+                    },
+                ),
             }
             # System developers may seamlessly append deployment, build, and CI hooks directly into the array here
         ]
 
         for intent in intent_registry:
-            match = intent["pattern"].match(prompt)
+            matcher = str(intent.get("matcher", "match")).lower()
+            if matcher == "search":
+                match = intent["pattern"].search(prompt)
+            else:
+                match = intent["pattern"].match(prompt)
             if match is not None:
                 try:
                     return intent["plan_builder"](match)

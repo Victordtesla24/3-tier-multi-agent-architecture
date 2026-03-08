@@ -261,14 +261,13 @@ def active_matrix_env_defaults(
     }
 
     selected_primary = primary_model_id or DEFAULT_ORCHESTRATION_MODEL
-    selected_level_model = primary_model_id or None
 
     tier_defaults = (
         ("PRIMARY_LLM", selected_primary),
         ("ORCHESTRATION_MODEL", selected_primary),
-        ("L1_MODEL", selected_level_model or DEFAULT_LEVEL1_MODEL),
-        ("L2_MODEL", selected_level_model or DEFAULT_LEVEL2_MODEL),
-        ("L3_MODEL", selected_level_model or DEFAULT_LEVEL3_MODEL),
+        ("L1_MODEL", DEFAULT_LEVEL1_MODEL),
+        ("L2_MODEL", DEFAULT_LEVEL2_MODEL),
+        ("L3_MODEL", DEFAULT_LEVEL3_MODEL),
         ("L2_AGENT_SWARMS", str(DEFAULT_L2_AGENT_SWARMS)),
         ("L3_AGENT_SWARMS", str(DEFAULT_L3_AGENT_SWARMS)),
     )
