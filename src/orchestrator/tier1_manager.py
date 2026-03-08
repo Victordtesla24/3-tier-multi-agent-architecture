@@ -39,6 +39,25 @@ def _resolved_level2_spec():
     return specs[4]
 
 
+def _extract_completion_content(response: Any) -> str:
+    choices = getattr(response, "choices", None)
+    if not isinstance(choices, list) or not choices:
+        return ""
+
+    message = getattr(choices[0], "message", None)
+    if isinstance(choices[0], dict):
+        message = choices[0].get("message", message)
+
+    if isinstance(message, dict):
+        content = message.get("content", "")
+    else:
+        content = getattr(message, "content", "")
+
+    if content is None:
+        return ""
+    return content if isinstance(content, str) else str(content)
+
+
 class GlobalMemorySnapshot(BaseModel):
     """
     Deterministic memory payload. This object is injected into Tier 2 Domain Agents
@@ -111,6 +130,7 @@ class Tier2DomainAgent:
         logger.debug(f"Applied Constraints: {self.memory.global_constraints}")
 
         spec = _resolved_level2_spec()
+        api_key_names: tuple[str, ...]
         if spec.crewai_model.startswith("gemini/"):
             api_key_names = ("GOOGLE_API_KEY", "GEMINI_API_KEY")
         elif spec.api_key_env:
@@ -153,7 +173,7 @@ class Tier2DomainAgent:
             if base_url:
                 kwargs["api_base"] = base_url
             response = await litellm.acompletion(**kwargs)
-            llm_output = response.choices[0].message.content or ""
+            llm_output = _extract_completion_content(response)
         except Exception as exc:
             raise RuntimeError(
                 f"Agent {self.agent_id} LLM call failed: {exc}"

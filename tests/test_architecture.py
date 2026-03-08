@@ -6,9 +6,9 @@ sys.path.append(str(Path(__file__).parent.parent / "src"))
 from engine.state_machine import OrchestrationStateMachine
 
 
-def test_engine_initialization():
+def test_engine_initialization(tmp_path):
     """Test that the python programmatic engine initializes correctly."""
-    engine = OrchestrationStateMachine(workspace_dir="/tmp/mock_workspace")
+    engine = OrchestrationStateMachine(workspace_dir=str(tmp_path / "workspace"))
     assert engine.state == "INIT"
     assert engine.max_retries == 3
 
@@ -37,16 +37,16 @@ def test_all_benchmarks_have_input_data_tag():
         assert "<input_data>" in content, f"Benchmark {bm.name} is missing the required <input_data> tag."
 
 
-def test_pipeline_telemetry_is_written():
+def test_pipeline_telemetry_is_written(tmp_path):
     """Test that executing the pipeline generates a valid structured telemetry JSON file."""
-    workspace = "/tmp/test_telemetry_workspace"
-    log_path = Path(workspace) / ".agent" / "memory" / "execution_log.json"
+    workspace = tmp_path / "telemetry-workspace"
+    log_path = workspace / ".agent" / "memory" / "execution_log.json"
 
     # Clean slate
     if log_path.exists():
         log_path.unlink()
 
-    _ = OrchestrationStateMachine(workspace_dir=workspace)
+    _ = OrchestrationStateMachine(workspace_dir=str(workspace))
 
     # The engine constructor creates the log file
     assert log_path.exists(), "Execution log was not created."
@@ -57,9 +57,9 @@ def test_pipeline_telemetry_is_written():
     assert "executions" in data, "Telemetry JSON is missing 'executions' key."
 
 
-def test_verification_scoring_rejects_placeholders():
+def test_verification_scoring_rejects_placeholders(tmp_path):
     """Test that the verification gate rejects outputs containing banned markers."""
-    engine = OrchestrationStateMachine(workspace_dir="/tmp/mock_workspace")
+    engine = OrchestrationStateMachine(workspace_dir=str(tmp_path / "workspace"))
 
     # Outputs with banned markers should fail verification
     assert engine._run_verification_scoring({"final_output": "# TODO: implement"}) is False
@@ -71,9 +71,9 @@ def test_verification_scoring_rejects_placeholders():
     assert engine._run_verification_scoring({"final_output": "Complete production code"}) is True
 
 
-def test_verification_scoring_ast_analysis():
+def test_verification_scoring_ast_analysis(tmp_path):
     """Test that AST analysis catches empty function bodies."""
-    engine = OrchestrationStateMachine(workspace_dir="/tmp/mock_workspace")
+    engine = OrchestrationStateMachine(workspace_dir=str(tmp_path / "workspace"))
 
     # Code with empty pass body should fail
     bad_output = '```python\ndef my_function():\n    pass\n```'

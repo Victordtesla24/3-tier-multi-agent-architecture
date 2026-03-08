@@ -1,4 +1,4 @@
-"""Antigravity 3-Tier Architecture — Execution Benchmark Harness
+"""Antigravity 3-Tier Architecture - Execution Benchmark Harness
 
 Measures end-to-end pipeline latency and success rate using the canonical
 CrewAI-backed orchestrator. Results are persisted as versioned JSON and
@@ -10,20 +10,22 @@ Usage:
     PYTHONPATH=src python benchmarks/run_benchmark.py
 """
 
+import json
 import os
 import sys
-
 import time
-import json
 from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-# Ensure src/ is on the module path regardless of invocation CWD
-sys.path.insert(0, str(Path(__file__).parent.parent))
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+SRC_ROOT = PROJECT_ROOT / "src"
 
-from engine.crewai_storage import bootstrap_crewai_storage
-from engine.workflow_primitives import sanitize_user_input
+
+def _bootstrap_src_path() -> None:
+    src_root = str(SRC_ROOT)
+    if src_root not in sys.path:
+        sys.path.insert(0, src_root)
 
 BENCHMARK_FIXTURES = [
     {
@@ -46,7 +48,10 @@ BENCHMARK_FIXTURES = [
 
 def run_single_benchmark(fixture: dict, workspace: Path) -> dict:
     """Execute a single benchmark fixture through the orchestrator pipeline."""
+    _bootstrap_src_path()
+
     from engine.crew_orchestrator import CrewAIThreeTierOrchestrator
+    from engine.workflow_primitives import sanitize_user_input
 
     result = {
         "name": fixture["name"],
@@ -76,11 +81,15 @@ def run_single_benchmark(fixture: dict, workspace: Path) -> dict:
 
 
 def main():
+    _bootstrap_src_path()
+
+    from engine.crewai_storage import bootstrap_crewai_storage
+
     print("=" * 60)
     print("  Antigravity Execution Benchmark Harness")
     print("=" * 60)
 
-    project_root = Path(__file__).parent.parent.resolve()
+    project_root = PROJECT_ROOT
 
     # Resolve benchmark workspace using the same pattern as the CLI.
     env_workspace = os.environ.get("ANTIGRAVITY_WORKSPACE_DIR")

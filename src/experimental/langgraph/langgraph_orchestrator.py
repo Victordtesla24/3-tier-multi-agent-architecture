@@ -1,8 +1,16 @@
+from __future__ import annotations
+
 import logging
 import os
 from pathlib import Path
-from typing import Dict
-from langgraph.graph import StateGraph, END
+from typing import Any
+
+try:
+    from langgraph.graph import END, StateGraph  # pyright: ignore[reportMissingImports]
+except ModuleNotFoundError:
+    END: Any = "__langgraph_missing__"
+    StateGraph: Any = None
+
 from .models import ArchitectState, OrchestrationPlan, L2ValidationResult
 from engine.llm_config import (
     require_env,
@@ -33,6 +41,25 @@ def _resolved_spec(tier_name: str):
     return mapping[tier_name]
 
 
+def _extract_completion_content(response: Any) -> str:
+    choices = getattr(response, "choices", None)
+    if not isinstance(choices, list) or not choices:
+        return ""
+
+    message = getattr(choices[0], "message", None)
+    if isinstance(choices[0], dict):
+        message = choices[0].get("message", message)
+
+    if isinstance(message, dict):
+        content = message.get("content", "")
+    else:
+        content = getattr(message, "content", "")
+
+    if content is None:
+        return ""
+    return content if isinstance(content, str) else str(content)
+
+
 def _llm_call(system: str, user: str, *, tier_name: str = "level1") -> str:
     """Issue a synchronous LiteLLM completion and return the response text.
 
@@ -45,6 +72,7 @@ def _llm_call(system: str, user: str, *, tier_name: str = "level1") -> str:
             "LLM-backed orchestration nodes."
         )
     spec = _resolved_spec(tier_name)
+    api_key_names: tuple[str, ...]
     if spec.crewai_model.startswith("gemini/"):
         api_key_names = ("GOOGLE_API_KEY", "GEMINI_API_KEY")
     elif spec.api_key_env:
@@ -72,14 +100,14 @@ def _llm_call(system: str, user: str, *, tier_name: str = "level1") -> str:
         if base_url:
             kwargs["api_base"] = base_url
         response = completion(**kwargs)
-        return response.choices[0].message.content or ""
+        return _extract_completion_content(response)
     except Exception as exc:
         raise RuntimeError(f"LiteLLM completion failed: {exc}") from exc
 
 
 # --- LangGraph Node Functions ---
 
-def prompt_reconstruction_node(state: ArchitectState) -> Dict:
+def prompt_reconstruction_node(state: ArchitectState) -> dict[str, Any]:
     """Executes the Prompt Reconstruction Protocol via a live LLM call."""
     logger.info("Executing Prompt Reconstruction...")
     system_prompt = (
@@ -90,7 +118,7 @@ def prompt_reconstruction_node(state: ArchitectState) -> Dict:
     constructed = _llm_call(system_prompt, state.raw_prompt, tier_name="level1")
     return {"reconstructed_prompt": constructed}
 
-def internet_research_node(state: ArchitectState) -> Dict:
+def internet_research_node(state: ArchitectState) -> dict[str, Any]:
     """Executes the Internet Research Agent via a live LLM call."""
     logger.info("Executing Internet Research...")
     system_prompt = (
@@ -105,7 +133,7 @@ def internet_research_node(state: ArchitectState) -> Dict:
     )
     return {"research_context": research}
 
-def l1_orchestration_node(state: ArchitectState) -> Dict:
+def l1_orchestration_node(state: ArchitectState) -> dict[str, Any]:
     """Executes the L1 Orchestrator Agent to map tasks."""
     logger.info("Executing L1 Orchestration...")
     plan = OrchestrationPlan(
@@ -114,7 +142,7 @@ def l1_orchestration_node(state: ArchitectState) -> Dict:
     )
     return {"l1_plan": plan}
 
-def l2_sub_agent_node(state: ArchitectState) -> Dict:
+def l2_sub_agent_node(state: ArchitectState) -> dict[str, Any]:
     """Executes L2 Sub-Agents which delegate to L3 and validate via live LLM calls."""
     logger.info("Executing L2 Sub-Agents & L3 Leaf Workers...")
     results = {}
@@ -152,7 +180,7 @@ def l2_sub_agent_node(state: ArchitectState) -> Dict:
             )
     return {"l2_results": results}
 
-def verification_node(state: ArchitectState) -> Dict:
+def verification_node(state: ArchitectState) -> dict[str, Any]:
     """Final verification of constraints and logging."""
     logger.info("Verifying Final Artifacts...")
     all_valid = all(res.is_valid for res in state.l2_results.values())
@@ -162,9 +190,14 @@ def verification_node(state: ArchitectState) -> Dict:
 
 # --- Graph Construction ---
 
-def build_architecture_graph() -> StateGraph:
+def build_architecture_graph() -> Any:
     """Builds the 3-Tier Multi-Agent architecture using LangGraph."""
-    
+    if StateGraph is None:
+        raise RuntimeError(
+            "langgraph is not installed. Run `uv sync --extra experimental` "
+            "to enable the experimental LangGraph orchestrator."
+        )
+
     workflow = StateGraph(ArchitectState)
 
     # Add Nodes
@@ -187,9 +220,9 @@ def build_architecture_graph() -> StateGraph:
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    
+
     app = build_architecture_graph()
-    
+
     # Example standalone execution test
     initial_state = ArchitectState(raw_prompt="Build a distributed Go microservice.")
     final_state = app.invoke(initial_state)

@@ -4,7 +4,7 @@ version = "2.0.0"
 description = "3-Tier Multi-Agent Architecture with CrewAI Integration"
 requires-python = ">=3.11"
 dependencies = [
-    "crewai[openai,litellm]>=0.80.0",
+    "crewai>=0.80.0",
     "crewai-tools>=0.75.0,<0.76.0",
     "chromadb>=0.5.0",
     "python-dotenv>=1.0.0",
@@ -17,7 +17,9 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "basedpyright>=1.32.1",
     "pytest>=7.4.0",
+    "pytest-cov>=7.0.0",
     "black",
     "mypy>=1.9.0",
     "ruff>=0.3.0",
@@ -31,9 +33,11 @@ experimental = [
 
 [dependency-groups]
 dev = [
+    "basedpyright>=1.32.1",
     "jupyter",
     "mypy>=1.19.1",
     "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
     "ruff>=0.15.4",
 ]
 
@@ -43,6 +47,13 @@ line-length = 88
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 norecursedirs = [".git", ".venv", "node_modules", "__pycache__", ".pytest_cache"]
+
+[tool.coverage.run]
+branch = true
+source = ["src"]
+
+[tool.coverage.report]
+skip_empty = true
 
 [tool.mypy]
 python_version = "3.12"
@@ -60,7 +71,14 @@ module = [
 ignore_missing_imports = true
 
 [tool.pyright]
-include = ["src", "tests"]
+include = [
+  "src",
+  "tests",
+  "main.py",
+  "benchmarks/run_benchmark.py",
+  "examples/general_llm/main.py",
+  "scripts/validate_runtime_env.py",
+]
 exclude = ["**/__pycache__", ".venv", "node_modules", ".git"]
 venvPath = "."
 venv = ".venv"
@@ -69,11 +87,21 @@ typeCheckingMode = "basic"
 executionEnvironments = [
   { root = ".", extraPaths = ["src"] },
   { root = "src", extraPaths = ["src"] },
-  { root = "tests", extraPaths = ["src"] }
+  { root = "tests", extraPaths = ["src"] },
+  { root = "benchmarks", extraPaths = ["src"] },
+  { root = "examples", extraPaths = ["src"] },
+  { root = "scripts", extraPaths = ["src"] },
 ]
 
 [tool.basedpyright]
-include = ["src", "tests"]
+include = [
+  "src",
+  "tests",
+  "main.py",
+  "benchmarks/run_benchmark.py",
+  "examples/general_llm/main.py",
+  "scripts/validate_runtime_env.py",
+]
 exclude = ["**/__pycache__", ".venv", "node_modules", ".git"]
 venvPath = "."
 venv = ".venv"
@@ -82,5 +110,8 @@ typeCheckingMode = "basic"
 executionEnvironments = [
   { root = ".", extraPaths = ["src"] },
   { root = "src", extraPaths = ["src"] },
-  { root = "tests", extraPaths = ["src"] }
+  { root = "tests", extraPaths = ["src"] },
+  { root = "benchmarks", extraPaths = ["src"] },
+  { root = "examples", extraPaths = ["src"] },
+  { root = "scripts", extraPaths = ["src"] },
 ]

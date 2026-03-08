@@ -219,7 +219,7 @@ def build_orchestration_context_block(
         f"- Key files: {', '.join(notable_docs) if notable_docs else 'none detected'}"
     )
     lines.append(
-        f"- Actionable nouns: workspace files, architecture docs, reports, benchmarks, runtime config, tests, A2UI action state."
+        "- Actionable nouns: workspace files, architecture docs, reports, benchmarks, runtime config, tests, A2UI action state."
     )
     lines.append("- Tool-to-domain mapping:")
     lines.extend(_capability_mapping_lines())

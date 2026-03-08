@@ -2,22 +2,25 @@ import sys
 import shutil
 import logging
 from pathlib import Path
+from typing import Any
+
+YAMLFactory: Any
 
 try:
-    from ruamel.yaml import YAML
+    from ruamel.yaml import YAML as YAMLFactory
 except ImportError:
-    YAML = None
+    YAMLFactory = None
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("ConfigManager")
 
 
-def _dump_simple_mapping(target_file: Path, data: dict) -> None:
+def _dump_simple_mapping(target_file: Path, data: dict[str, Any]) -> None:
     """Fallback writer used when ruamel.yaml is unavailable."""
     lines = [f"{key}: {value}" for key, value in data.items()]
     target_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-def merge_config_safely(config_path: str, new_settings: dict) -> None:
+def merge_config_safely(config_path: str, new_settings: dict[str, Any]) -> None:
     """
     Safely merges new settings into the GEMINI config file using an atomic YAML parser.
     Backs up the existing config first to prevent catastrophic data loss and preserves comments.
@@ -35,35 +38,37 @@ def merge_config_safely(config_path: str, new_settings: dict) -> None:
     logger.info(f"Atomic backup created at {backup_path}")
 
     try:
-        if YAML is None:
+        if YAMLFactory is None:
             logger.warning(
                 "ruamel.yaml is unavailable; falling back to simple key/value config writing."
             )
-            data = {}
+            data: dict[str, Any] = {}
         else:
-            yaml = YAML()
+            yaml = YAMLFactory()
             yaml.preserve_quotes = True
 
-            with open(target_file, 'r') as f:
+            with target_file.open("r", encoding="utf-8") as f:
                 raw = f.read()
             try:
                 import io
-                data = yaml.load(io.StringIO(raw))
+                loaded = yaml.load(io.StringIO(raw))
             except Exception:
                 # File is not valid YAML (e.g., it is a Markdown document).
                 # Treat existing content as opaque and seed an empty mapping.
-                data = None
-            if not isinstance(data, dict):
+                loaded = {}
+            if isinstance(loaded, dict):
+                data = loaded
+            else:
                 data = {}
 
         # Merge structurally
         for key, value in new_settings.items():
             data[key] = value
 
-        if YAML is None:
+        if YAMLFactory is None:
             _dump_simple_mapping(target_file, data)
         else:
-            with open(target_file, 'w') as f:
+            with target_file.open("w", encoding="utf-8") as f:
                 yaml.dump(data, f)
 
         logger.info(f"Configuration merged and safely injected into {config_path}")

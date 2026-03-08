@@ -1,5 +1,5 @@
 ---
-status: done
+status: complete
 priority: p2
 issue_id: "012"
 tags: [code-review, quality, observability, data-integrity]

@@ -21,6 +21,7 @@ There are open reliability concerns and ready todo findings in the current branc
 - [x] Reproduce at least one high-priority bug and fix it.
 - [x] Apply targeted refactor only where it improves correctness/maintainability.
 - [x] Validate changes with focused tests and keep behavior deterministic.
+- [x] Clear repo-wide lint and static type-check failures discovered during SLFG verification.
 
 ## Acceptance Criteria
 
@@ -48,6 +49,12 @@ There are open reliability concerns and ready todo findings in the current branc
 - [x] Apply small refactor around touched code to improve clarity/safety.
 - [x] Run targeted test suite for changed components.
 - [x] Update plan completion state and summarize outcomes.
+
+### Phase 4: Repository quality sweep
+
+- [x] Run repo-wide lint and identify remaining failures outside the targeted branch diff.
+- [x] Fix static-analysis defects in runtime env, config, provider, and experimental modules.
+- [x] Re-run full repo validation (`ruff`, `mypy`, `pytest`) and record the results.
 
 ## Candidate Sources
 
@@ -82,3 +89,6 @@ There are open reliability concerns and ready todo findings in the current branc
 - Verification:
   - `PYTHONPATH=src ./.venv/bin/python -m pytest tests/test_capability_parity.py tests/test_orchestration_hardening.py -q`
   - `17 passed`
+  - `./.venv/bin/ruff check src tests`
+  - `./.venv/bin/python -m mypy src tests`
+  - `./.venv/bin/python -m pytest -q`

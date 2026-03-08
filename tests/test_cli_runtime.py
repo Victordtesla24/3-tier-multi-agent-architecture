@@ -12,8 +12,8 @@ from engine.status_banner import STATUS_BANNER
 def _load_cli_module():
     cli_path = Path(__file__).parent.parent / "src" / "orchestrator" / "antigravity-cli.py"
     spec = importlib.util.spec_from_file_location("antigravity_cli_entrypoint", cli_path)
+    assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
-    assert spec and spec.loader
     spec.loader.exec_module(module)
     return module
 

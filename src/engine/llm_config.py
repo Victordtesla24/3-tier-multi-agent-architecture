@@ -6,15 +6,17 @@ import re
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional, Sequence, TYPE_CHECKING
+from typing import Any, Optional, Sequence, TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
-    from crewai import LLM
-else:  # pragma: no cover - exercised by validation script in lean environments
-    try:
-        from crewai import LLM
-    except ModuleNotFoundError:  # pragma: no cover - import guard only
-        LLM = None  # type: ignore[assignment]
+    from crewai import LLM as CrewAILLM
+else:  # pragma: no cover - annotations only
+    CrewAILLM = Any
+
+try:
+    from crewai import LLM as _RuntimeCrewAILLM
+except ModuleNotFoundError:  # pragma: no cover - import guard only
+    _RuntimeCrewAILLM = None
 
 from engine.model_catalog import (
     DEFAULT_LEVEL1_FALLBACK_MODEL,
@@ -32,11 +34,13 @@ from engine.model_catalog import (
 from engine.runtime_env import (
     EnvConfigError,
     ResolvedRuntimeEnv,
-    load_workspace_env,
+    load_workspace_env as _load_workspace_env,
     normalize_model_identifier,
     resolve_runtime_env,
     resolve_runtime_env_from_environ,
 )
+
+load_workspace_env = _load_workspace_env
 
 
 class Effort(str, Enum):
@@ -163,7 +167,7 @@ def model_spec_from_catalog(
     spec_requested_temperature = (
         entry.requested_temperature
         if requested_temperature is _AUTO
-        else requested_temperature
+        else cast(float | None, requested_temperature)
     )
     if runtime_temperature is _AUTO:
         spec_runtime_temperature = (
@@ -172,7 +176,7 @@ def model_spec_from_catalog(
             else spec_requested_temperature
         )
     else:
-        spec_runtime_temperature = runtime_temperature
+        spec_runtime_temperature = cast(float | None, runtime_temperature)
 
     return ModelSpec(
         logical_id=entry.logical_id,
@@ -313,12 +317,12 @@ def validate_provider_runtime_env(
     return resolved
 
 
-def build_llm(spec: ModelSpec) -> LLM:
+def build_llm(spec: ModelSpec) -> CrewAILLM:
     """
     Creates a CrewAI LLM instance for the given model spec.
     For OpenAI-compatible proxies, set base_url via spec.base_url_env.
     """
-    if LLM is None:  # pragma: no cover - runtime-only guard
+    if _RuntimeCrewAILLM is None:  # pragma: no cover - runtime-only guard
         raise ModuleNotFoundError(
             "crewai is not installed. Install crewai to build runtime LLM clients."
         )
@@ -337,7 +341,7 @@ def build_llm(spec: ModelSpec) -> LLM:
     if spec.crewai_model.startswith("gemini/"):
         if spec.runtime_temperature is not None:
             kwargs["temperature"] = spec.runtime_temperature
-        return LLM(**kwargs)
+        return _RuntimeCrewAILLM(**kwargs)
 
     if _supports_reasoning_effort(spec):
         kwargs["reasoning_effort"] = spec.effort.value
@@ -352,13 +356,13 @@ def build_llm(spec: ModelSpec) -> LLM:
     for blocked in policy.blocked_params:
         kwargs.pop(blocked, None)
 
-    return LLM(**kwargs)
+    return _RuntimeCrewAILLM(**kwargs)
 
 
 @dataclass(frozen=True)
 class ModelTier:
-    primary: LLM
-    fallback: LLM
+    primary: CrewAILLM
+    fallback: CrewAILLM
 
 
 PRIMARY_LLM_MAP: dict[str, tuple[str, str | None]] = {

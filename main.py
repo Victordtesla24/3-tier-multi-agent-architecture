@@ -14,12 +14,12 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 SRC_ROOT = PROJECT_ROOT / "src"
-if str(SRC_ROOT) not in sys.path:
-    sys.path.insert(0, str(SRC_ROOT))
 
-from orchestrator.tier1_manager import AsyncTier1Orchestrator
-from utility.mcp_executor import MCPUtilityExecutor, fetch_database_schema
-from view.a2ui_protocol import A2UIViewAgent
+
+def _bootstrap_src_path() -> None:
+    src_root = str(SRC_ROOT)
+    if src_root not in sys.path:
+        sys.path.insert(0, src_root)
 
 # Standardize logging format for the demonstration
 logging.basicConfig(
@@ -30,6 +30,12 @@ logger = logging.getLogger("System_Integration")
 
 
 async def run_system() -> None:
+    _bootstrap_src_path()
+
+    from orchestrator.tier1_manager import AsyncTier1Orchestrator
+    from utility.mcp_executor import MCPUtilityExecutor, fetch_database_schema
+    from view.a2ui_protocol import A2UIViewAgent
+
     logger.info("Initializing 3-Tier Multi-Agent AVC System...")
 
     # -----------------------------------------------------------------------

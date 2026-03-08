@@ -1,5 +1,5 @@
 ---
-status: done
+status: complete
 priority: p1
 issue_id: "009"
 tags: [code-review, agent-native, ui, architecture]

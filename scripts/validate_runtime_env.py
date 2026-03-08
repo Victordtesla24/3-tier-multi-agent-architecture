@@ -6,18 +6,28 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SRC_ROOT = PROJECT_ROOT / "src"
-if str(SRC_ROOT) not in sys.path:
-    sys.path.insert(0, str(SRC_ROOT))
 
-from engine.provider_healthchecks import probe_configured_providers
-from engine.runtime_env import (
-    ConfiguredProviderInventory,
-    EnvConfigError,
-    resolve_runtime_env,
-)
+if TYPE_CHECKING:
+    from engine.runtime_env import ConfiguredProviderInventory
+
+
+def _bootstrap_src_path() -> None:
+    src_root = str(SRC_ROOT)
+    if src_root not in sys.path:
+        sys.path.insert(0, src_root)
+
+
+def probe_configured_providers(workspace: Path, project_root: Path):
+    _bootstrap_src_path()
+    from engine.provider_healthchecks import (
+        probe_configured_providers as _probe_configured_providers,
+    )
+
+    return _probe_configured_providers(workspace, project_root)
 
 
 def _is_placeholder(value: str | None) -> bool:
@@ -47,7 +57,7 @@ def _provider_status_lines(keys: tuple[str, ...]) -> list[str]:
 
 
 def _configured_provider_inventory_lines(
-    providers: tuple[ConfiguredProviderInventory, ...],
+    providers: tuple["ConfiguredProviderInventory", ...],
 ) -> list[str]:
     lines: list[str] = []
     for provider in providers:
@@ -73,6 +83,9 @@ def _configured_provider_inventory_lines(
 
 
 def _print_structural_audit(workspace: Path, project_root: Path) -> tuple[int, object]:
+    _bootstrap_src_path()
+    from engine.runtime_env import EnvConfigError, resolve_runtime_env
+
     try:
         runtime_env = resolve_runtime_env(workspace, project_root=project_root)
     except EnvConfigError as exc:
@@ -114,6 +127,7 @@ def _print_structural_audit(workspace: Path, project_root: Path) -> tuple[int, o
 
 
 def _probe_live_tiers(runtime_env) -> int:
+    _bootstrap_src_path()
     try:
         from engine.llm_config import build_llm, resolved_model_specs
     except ModuleNotFoundError as exc:

@@ -3,12 +3,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Sequence
-
-try:
-    from dotenv import load_dotenv as _load_dotenv
-except ModuleNotFoundError:  # pragma: no cover - exercised via direct script usage
-    _load_dotenv = None
+from typing import Callable, Iterable, Sequence
 
 from engine.model_catalog import (
     DEFAULT_LEVEL1_FALLBACK_MODEL,
@@ -22,6 +17,19 @@ from engine.model_catalog import (
     MODEL_CATALOG,
     get_model_entry,
 )
+
+_DotenvLoader = Callable[..., bool]
+
+
+def _resolve_dotenv_loader() -> _DotenvLoader | None:
+    try:
+        from dotenv import load_dotenv
+    except ModuleNotFoundError:  # pragma: no cover - exercised via direct script usage
+        return None
+    return load_dotenv
+
+
+_load_dotenv = _resolve_dotenv_loader()
 
 
 class EnvConfigError(RuntimeError):

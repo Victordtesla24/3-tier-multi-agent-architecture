@@ -430,7 +430,6 @@ class CrewAIThreeTierOrchestrator:
         expected_output: str,
         tools: list[Any] | None = None,
         allow_delegation: bool = False,
-        max_reasoning_attempts: int = 3,
     ) -> str:
         agent_kwargs: dict[str, Any] = {
             "role": role,
@@ -439,8 +438,6 @@ class CrewAIThreeTierOrchestrator:
             "llm": llm,
             "verbose": self.verbose,
             "allow_delegation": allow_delegation,
-            "reasoning": True,
-            "max_reasoning_attempts": max_reasoning_attempts,
         }
         if tools is not None:
             agent_kwargs["tools"] = tools
@@ -727,7 +724,6 @@ class CrewAIThreeTierOrchestrator:
                 description=description,
                 expected_output="Concrete task-local output only.",
                 tools=selected_worker_tools or None,
-                max_reasoning_attempts=2,
             )
 
         return self._run_stage_with_tier_fallback(
@@ -978,8 +974,6 @@ class CrewAIThreeTierOrchestrator:
                 llm=llm,
                 verbose=self.verbose,
                 allow_delegation=False,
-                reasoning=True,
-                max_reasoning_attempts=3,
             )
 
             task = Task(
@@ -1023,8 +1017,6 @@ class CrewAIThreeTierOrchestrator:
                 llm=llm,
                 verbose=self.verbose,
                 allow_delegation=False,
-                reasoning=True,
-                max_reasoning_attempts=3,
             )
 
             task = Task(
@@ -1207,8 +1199,6 @@ class CrewAIThreeTierOrchestrator:
                 llm=orchestration_llm,
                 verbose=self_ref.verbose,
                 allow_delegation=True,
-                reasoning=True,
-                max_reasoning_attempts=3,
             )
 
             senior = Agent(
@@ -1218,8 +1208,6 @@ class CrewAIThreeTierOrchestrator:
                 llm=level1_llm,
                 verbose=self_ref.verbose,
                 allow_delegation=True,
-                reasoning=True,
-                max_reasoning_attempts=3,
             )
 
             coordinator = Agent(
@@ -1232,8 +1220,6 @@ class CrewAIThreeTierOrchestrator:
                 llm=level2_llm,
                 verbose=self_ref.verbose,
                 allow_delegation=True,
-                reasoning=True,
-                max_reasoning_attempts=3,
             )
 
             worker_tools = self_ref._build_worker_tools()
@@ -1250,8 +1236,6 @@ class CrewAIThreeTierOrchestrator:
                 verbose=self_ref.verbose,
                 allow_delegation=False,
                 tools=worker_tools,
-                reasoning=True,
-                max_reasoning_attempts=2,
             )
 
             kickoff_task = Task(

@@ -1,5 +1,12 @@
 {
-  "include": ["src", "tests"],
+  "include": [
+    "src",
+    "tests",
+    "main.py",
+    "benchmarks/run_benchmark.py",
+    "examples/general_llm/main.py",
+    "scripts/validate_runtime_env.py"
+  ],
   "exclude": [
     "**/__pycache__",
     ".venv",
@@ -21,6 +28,18 @@
     },
     {
       "root": "tests",
+      "extraPaths": ["src"]
+    },
+    {
+      "root": "benchmarks",
+      "extraPaths": ["src"]
+    },
+    {
+      "root": "examples",
+      "extraPaths": ["src"]
+    },
+    {
+      "root": "scripts",
       "extraPaths": ["src"]
     }
   ]

@@ -14,8 +14,8 @@ def _load_validate_runtime_env_module():
     spec = importlib.util.spec_from_file_location(
         "validate_runtime_env_script", script_path
     )
-    module = importlib.util.module_from_spec(spec)
     assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 

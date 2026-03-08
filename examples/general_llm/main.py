@@ -2,18 +2,27 @@ import os
 import sys
 from pathlib import Path
 
-# Ensure the src directory is in the path for standalone execution
-sys.path.append(str(Path(__file__).parent.parent.parent / "src"))
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+SRC_ROOT = PROJECT_ROOT / "src"
 
-from engine.crew_orchestrator import CrewAIThreeTierOrchestrator
+
+def _bootstrap_src_path() -> None:
+    src_root = str(SRC_ROOT)
+    if src_root not in sys.path:
+        sys.path.insert(0, src_root)
+
 
 def main():
     """
     A standalone example of executing the 3-Tier Multi-Agent Architecture
     without using the Antigravity CLI.
     """
+    _bootstrap_src_path()
+
+    from engine.crew_orchestrator import CrewAIThreeTierOrchestrator
+
     # 1. Define the workspace directory where logs and temporary files will be stored.
-    workspace_dir = str(Path(__file__).parent.parent.parent.resolve())
+    workspace_dir = str(PROJECT_ROOT)
     
     # 2. Check if API keys are set (At least Google Gemini and OpenAI are required)
     if not os.environ.get("GOOGLE_API_KEY") or not os.environ.get("OPENAI_API_KEY"):

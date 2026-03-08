@@ -1,5 +1,5 @@
 ---
-status: done
+status: complete
 priority: p1
 issue_id: "008"
 tags: [python, readme, installation, clean-room, validation, crewai]

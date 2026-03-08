@@ -299,7 +299,11 @@ def _probe_google_provider(
     *,
     timeout_s: float,
 ) -> tuple[ProviderProbeResult, ...]:
-    api_key = os.environ.get(inventory.api_key_env, "").strip()
+    api_key = (
+        os.environ.get(inventory.api_key_env, "").strip()
+        if inventory.api_key_env is not None
+        else ""
+    )
     provider_id = _PROVIDER_ID_BY_GROUP[inventory.provider_group]
     if not inventory.api_key_configured or not api_key:
         missing_targets = (

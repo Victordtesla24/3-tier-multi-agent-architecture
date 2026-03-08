@@ -1,5 +1,12 @@
 """Pytest configuration — redirect CrewAI and appdirs storage before any imports."""
 import os
+from pathlib import Path
+import sys
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_SRC_ROOT = _PROJECT_ROOT / "src"
+if str(_SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(_SRC_ROOT))
 
 # CrewAI's db_storage_path() runs at module-load time (class default param) and calls
 # appdirs.user_data_dir() which on macOS resolves to ~/Library/Application Support/.
@@ -14,7 +21,7 @@ os.environ["CREWAI_HOME"] = _TMP_STORAGE
 
 # Monkey-patch appdirs before crewai import
 try:
-    import appdirs as _appdirs
+    import appdirs as _appdirs  # type: ignore[import-untyped]
 
     _orig_user_data_dir = _appdirs.user_data_dir
 
