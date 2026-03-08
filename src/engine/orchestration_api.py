@@ -5,7 +5,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, Mapping
 
-from engine.llm_config import EnvConfigError, load_workspace_env, validate_provider_runtime_env
+from engine.llm_config import EnvConfigError, resolved_model_specs, validate_provider_runtime_env
+from engine.runtime_env import resolve_runtime_env
 from engine.state_machine import OrchestrationStateMachine
 
 
@@ -73,8 +74,11 @@ def run_orchestration(config: OrchestrationRunConfig) -> OrchestrationRunResult:
     # Pre-flight provider validation to fail fast on misconfiguration.
     if config.strict_provider_validation:
         try:
-            load_workspace_env(workspace, project_root=project_root)
-            validate_provider_runtime_env(strict=True)
+            runtime_env = resolve_runtime_env(workspace, project_root=project_root)
+            validate_provider_runtime_env(
+                strict=True,
+                model_specs=resolved_model_specs(runtime_env),
+            )
         except EnvConfigError as exc:
             tmp_dir = workspace / ".agent" / "tmp"
             memory_dir = workspace / ".agent" / "memory"

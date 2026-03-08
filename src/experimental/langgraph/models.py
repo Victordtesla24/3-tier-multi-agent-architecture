@@ -7,7 +7,7 @@ class AgentRuleMetadata(BaseModel):
     """Represents the YAML frontmatter of an .agent/rules/*.md file"""
     trigger: str = Field(..., description="When the agent is triggered (e.g., manual, always_on)")
     priority: int = Field(..., description="Execution priority (lower is earlier)")
-    model: Optional[str] = Field(default="Gemini 3.1 Pro Preview", description="The LLM model used")
+    model: Optional[str] = Field(default="Gemini 3 Pro Preview", description="The LLM model used")
     role: str = Field(..., description="The highly specific expert role/persona this agent embodies.")
     goal: str = Field(..., description="The singular, deterministic goal this agent strives to achieve.")
     backstory: str = Field(..., description="The behavioral backstory informing the agent's logic and rigor.")

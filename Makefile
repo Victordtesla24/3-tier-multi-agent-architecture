@@ -1,8 +1,15 @@
-.PHONY: install integrate-crewai test-audit test-pytest test-e2e test build run-cli benchmark clean
+.PHONY: install integrate-crewai ensure-venv test-audit test-pytest test-e2e test build run-cli benchmark clean
+
+VENV_DIR ?= $(CURDIR)/.venv
+PYTHON_BIN ?= $(VENV_DIR)/bin/python
+UV_CACHE_DIR ?= /tmp/uv-cache
 
 install:
 	@command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh
-	env -u VIRTUAL_ENV UV_PROJECT_ENVIRONMENT=/tmp/.venv-antigravity UV_CACHE_DIR=/tmp/uv-cache uv sync --all-extras --python 3.12
+	env -u VIRTUAL_ENV UV_PROJECT_ENVIRONMENT=$(VENV_DIR) UV_CACHE_DIR=$(UV_CACHE_DIR) uv sync --all-extras --python 3.12
+
+ensure-venv:
+	@test -x "$(PYTHON_BIN)" || (echo "Error: missing virtualenv interpreter at $(PYTHON_BIN). Run 'make install' or 'uv sync --all-extras --python 3.12' first."; exit 1)
 
 integrate-crewai:
 	chmod +x scripts/integrate_crewai.sh
@@ -11,9 +18,9 @@ integrate-crewai:
 # Audits that the test collection contains a non-trivial number of tests.
 # Runs from the tests/ subdirectory to avoid macOS .DS_Store PermissionError
 # on /Users/Shared when chromadb/pydantic statically stat('.env') at import time.
-test-audit:
+test-audit: ensure-venv
 	@echo "Auditing test collection..."
-	@cd tests && PYTHONPATH=$(CURDIR)/src /tmp/.venv-antigravity/bin/pytest \
+	@cd tests && PYTHONPATH=$(CURDIR)/src $(PYTHON_BIN) -m pytest \
 		test_architecture.py test_crewai_integration.py test_contracts.py test_cli_runtime.py test_improvement_plan_workstreams.py test_orchestration_hardening.py \
 		--collect-only -q -p no:cacheprovider > /tmp/collect.txt || true
 	@COUNT=$$(grep -c "::" /tmp/collect.txt || true); \
@@ -25,12 +32,12 @@ test-audit:
 	@echo "Tests collected successfully."
 
 test-pytest: test-audit
-	cd tests && PYTHONPATH=$(CURDIR)/src /tmp/.venv-antigravity/bin/pytest \
+	cd tests && PYTHONPATH=$(CURDIR)/src $(PYTHON_BIN) -m pytest \
 		test_architecture.py test_crewai_integration.py test_contracts.py test_cli_runtime.py test_improvement_plan_workstreams.py test_orchestration_hardening.py test_runtime_graph.py \
 		-v -p no:cacheprovider
 
-test-e2e:
-	cd tests && PYTHONPATH=$(CURDIR)/src /tmp/.venv-antigravity/bin/pytest \
+test-e2e: ensure-venv
+	cd tests && PYTHONPATH=$(CURDIR)/src $(PYTHON_BIN) -m pytest \
 		test_e2e.py -v -p no:cacheprovider
 
 test: test-pytest test-e2e
@@ -38,14 +45,14 @@ test: test-pytest test-e2e
 build:
 	docker build -t antigravity-engine:latest .
 
-run-cli:
-	PYTHONPATH=src /tmp/.venv-antigravity/bin/python src/orchestrator/antigravity-cli.py \
+run-cli: ensure-venv
+	PYTHONPATH=src $(PYTHON_BIN) src/orchestrator/antigravity-cli.py \
 		--prompt "test" --workspace /tmp/antigravity_workspace \
 		--strict-provider-validation --max-provider-4xx 50
 
-benchmark:
+benchmark: ensure-venv
 	@echo "Running execution benchmark harness..."
-	cd /tmp && PYTHONPATH=$(CURDIR)/src /tmp/.venv-antigravity/bin/python $(CURDIR)/benchmarks/run_benchmark.py
+	cd /tmp && PYTHONPATH=$(CURDIR)/src $(PYTHON_BIN) $(CURDIR)/benchmarks/run_benchmark.py
 
 clean:
 	rm -rf /tmp/antigravity_workspace

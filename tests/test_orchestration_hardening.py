@@ -4,6 +4,7 @@ import os
 import sys
 from ast import literal_eval
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -127,12 +128,22 @@ def test_run_orchestration_propagates_verbose_flag(monkeypatch, tmp_path):
         def execute_pipeline_with_metadata(self, raw_prompt: str):
             return True, {
                 "run_id": "fake-run",
-                "execution_log_path": str(tmp_path / "workspace" / ".agent" / "memory" / "execution_log.json"),
-                "final_output_path": str(tmp_path / "workspace" / ".agent" / "tmp" / "final_output.md"),
-                "reconstructed_prompt_path": str(
-                    tmp_path / "workspace" / ".agent" / "tmp" / "reconstructed_prompt.md"
+                "execution_log_path": str(
+                    tmp_path / "workspace" / ".agent" / "memory" / "execution_log.json"
                 ),
-                "research_context_path": str(tmp_path / "workspace" / ".agent" / "tmp" / "research-context.md"),
+                "final_output_path": str(
+                    tmp_path / "workspace" / ".agent" / "tmp" / "final_output.md"
+                ),
+                "reconstructed_prompt_path": str(
+                    tmp_path
+                    / "workspace"
+                    / ".agent"
+                    / "tmp"
+                    / "reconstructed_prompt.md"
+                ),
+                "research_context_path": str(
+                    tmp_path / "workspace" / ".agent" / "tmp" / "research-context.md"
+                ),
                 "provider_4xx_count": 0,
                 "completion_status": "success",
                 "completion_summary": "ok",
@@ -165,6 +176,122 @@ def test_run_orchestration_propagates_verbose_flag(monkeypatch, tmp_path):
     assert captured["verbose"] is True
 
 
+def test_run_orchestration_preflight_uses_env_resolved_active_tiers(
+    monkeypatch, tmp_path
+):
+    captured: dict[str, object] = {}
+
+    class _FakeStateMachine:
+        def __init__(self, *args, **kwargs):
+            captured["constructed"] = True
+            self.run_id = "fake-run"
+            self.provider_4xx_count = 0
+
+        def execute_pipeline_with_metadata(self, raw_prompt: str):
+            return True, {
+                "run_id": "fake-run",
+                "execution_log_path": str(
+                    tmp_path / "workspace" / ".agent" / "memory" / "execution_log.json"
+                ),
+                "final_output_path": str(
+                    tmp_path / "workspace" / ".agent" / "tmp" / "final_output.md"
+                ),
+                "reconstructed_prompt_path": str(
+                    tmp_path
+                    / "workspace"
+                    / ".agent"
+                    / "tmp"
+                    / "reconstructed_prompt.md"
+                ),
+                "research_context_path": str(
+                    tmp_path / "workspace" / ".agent" / "tmp" / "research-context.md"
+                ),
+                "provider_4xx_count": 0,
+                "completion_status": "success",
+                "completion_summary": "ok",
+                "failed_stage": None,
+                "stage_progress": {},
+            }
+
+        def get_completion_snapshot(self):
+            return {
+                "completion_status": "success",
+                "completion_summary": "ok",
+                "failed_stage": None,
+                "stage_progress": {},
+            }
+
+    monkeypatch.setattr(
+        "engine.orchestration_api.OrchestrationStateMachine",
+        _FakeStateMachine,
+    )
+    monkeypatch.setattr("engine.orchestration_api._project_root", lambda: tmp_path)
+    with patch.dict(
+        "os.environ",
+        {
+            "PRIMARY_LLM": "openai/gpt-5.4",
+            "ORCHESTRATION_MODEL": "gemini/gemini-3.1-pro-preview",
+            "L1_MODEL": "openai/gpt-5.2-codex",
+            "L2_MODEL": "ollama/qwen3:8b",
+            "L3_MODEL": "ollama/qwen2.5-coder:7b",
+            "GOOGLE_API_KEY": "real_google",
+            "OPENAI_API_KEY": "real_openai",
+            "OLLAMA_BASE_URL": "http://127.0.0.1:11434",
+        },
+        clear=True,
+    ):
+        result = run_orchestration(
+            OrchestrationRunConfig(
+                prompt="smoke",
+                workspace=tmp_path / "workspace",
+                strict_provider_validation=True,
+            )
+        )
+
+    assert result.success is True
+    assert captured["constructed"] is True
+
+
 def test_makefile_default_targets_include_workstream_suite():
     makefile = (Path(__file__).parent.parent / "Makefile").read_text(encoding="utf-8")
     assert makefile.count("test_improvement_plan_workstreams.py") >= 2
+
+
+def test_tier1_manager_drops_unsupported_openai_proxy_params(monkeypatch):
+    import asyncio
+    from types import SimpleNamespace
+
+    from engine.llm_config import model_spec_from_catalog
+    from orchestrator.tier1_manager import GlobalMemorySnapshot, Tier2DomainAgent
+
+    captured: dict[str, object] = {}
+
+    async def _fake_acompletion(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content='{"ok": true}'))]
+        )
+
+    monkeypatch.setattr(
+        "orchestrator.tier1_manager._resolved_level2_spec",
+        lambda: model_spec_from_catalog("ollama/qwen3:8b"),
+    )
+    monkeypatch.setattr(
+        "orchestrator.tier1_manager.litellm.acompletion", _fake_acompletion
+    )
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+
+    agent = Tier2DomainAgent(
+        agent_id="agent-1",
+        domain_type="Research",
+        memory_snapshot=GlobalMemorySnapshot(user_id="user-1"),
+    )
+    result = asyncio.run(
+        agent.execute_fsm_playbook({"directive": "Analyze local architecture docs."})
+    )
+
+    assert result.status == "COMPLETED"
+    assert captured["drop_params"] is True
+    assert captured["api_base"] == "http://127.0.0.1:11434"
+    assert "api_key" not in captured
+    assert "reasoning_effort" not in captured

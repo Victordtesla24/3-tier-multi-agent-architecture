@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import re
+import asyncio
 from pathlib import Path
 from typing import Any, Callable, Optional
 
@@ -51,10 +52,12 @@ _telemetry_logger = logging.getLogger("AntigravityTelemetry")
 
 class CrewAIThreeTierOrchestrator:
     """
-    CrewAI-backed orchestrator that preserves the 3-tier boundaries:
-      - Orchestration tier: manager/router (Gemini primary → GPT-5.2-Codex fallback)
-      - Level 1: senior/analytical agents (GPT-5.2-Codex primary → MiniMax fallback)
-      - Level 2: execution/worker agents (MiniMax primary → DeepSeek fallback)
+    CrewAI-backed orchestrator that preserves an explicit orchestration tier plus
+    three agent layers:
+      - Orchestration tier: manager/router (GPT-5.4 primary → GPT-5.2 Codex fallback)
+      - Level 1: analytical/planning agents (Gemini 3.1 Pro Preview primary → Ollama Qwen 3 14B fallback)
+      - Level 2: coordination/validation agents (Ollama Qwen 3 8B primary → Ollama Qwen 3 14B fallback)
+      - Level 3: execution/leaf-worker agents (Ollama Qwen 2.5 Coder 7B primary → Ollama Qwen 2.5 Coder 14B fallback)
 
     Memory is enabled at Crew level and stored under <workspace>/.agent/memory/crewai_storage.
     """
@@ -88,6 +91,12 @@ class CrewAIThreeTierOrchestrator:
             project_root=_MODULE_PROJECT_ROOT,
             strict_validation=self.strict_provider_validation,
         )
+        self._level2_evaluator_semaphore = (
+            asyncio.Semaphore(self.models.level2_swarm_count)
+            if self.models.level2_swarm_count
+            else None
+        )
+        self._emit_runtime_env_resolved()
 
     def _emit_telemetry(self, event_type: str, details: dict) -> None:
         """Emit a telemetry event to the registered hook.
@@ -113,6 +122,34 @@ class CrewAIThreeTierOrchestrator:
         provider = model.split("/", maxsplit=1)[0] if "/" in model else "unknown"
         return provider, model
 
+    def _emit_runtime_env_resolved(self) -> None:
+        self._emit_telemetry(
+            "RUNTIME_ENV_RESOLVED",
+            {
+                "run_id": self.run_id,
+                "tier_primary_logical_ids": dict(self.models.tier_primary_logical_ids),
+                "tier_fallback_logical_ids": dict(
+                    self.models.tier_fallback_logical_ids
+                ),
+                "tier_primary_runtime_models": {
+                    "orchestration": str(self.models.orchestration.primary.model),
+                    "level1": str(self.models.level1.primary.model),
+                    "level2": str(self.models.level2.primary.model),
+                    "level3": str(self.models.level3.primary.model),
+                },
+                "tier_fallback_runtime_models": {
+                    "orchestration": str(self.models.orchestration.fallback.model),
+                    "level1": str(self.models.level1.fallback.model),
+                    "level2": str(self.models.level2.fallback.model),
+                    "level3": str(self.models.level3.fallback.model),
+                },
+                "active_provider_env_keys": list(self.models.active_provider_env_keys),
+                "level2_swarm_count": self.models.level2_swarm_count,
+                "level3_swarm_count": self.models.level3_swarm_count,
+                "warnings": list(self.models.config_warnings),
+            },
+        )
+
     def _emit_provider_attempt(
         self,
         *,
@@ -133,8 +170,12 @@ class CrewAIThreeTierOrchestrator:
             "provider": provider,
             "attempt": attempt,
             "request_id": None,
-            "http_status": classified.get("http_status", 200 if error is None else None),
-            "error_type": classified.get("error_type", "none" if error is None else type(error).__name__),
+            "http_status": classified.get(
+                "http_status", 200 if error is None else None
+            ),
+            "error_type": classified.get(
+                "error_type", "none" if error is None else type(error).__name__
+            ),
             "error_code": classified.get("error_code"),
             "retriable": classified.get("retriable", True if error is None else False),
             "fallback_used": fallback_used,
@@ -186,7 +227,9 @@ class CrewAIThreeTierOrchestrator:
             "- complete_task: emit explicit completion signal with status success|partial|blocked."
         )
 
-    def _build_worker_tools(self, *, stage_name: str = "execution_hierarchical") -> list[Any]:
+    def _build_worker_tools(
+        self, *, stage_name: str = "execution_hierarchical"
+    ) -> list[Any]:
         # Safe-by-default tooling: scoped workspace tools + restricted project-root
         # tools + explicit health/runtime controls.
         tools = [
@@ -460,7 +503,9 @@ class CrewAIThreeTierOrchestrator:
         )
         previous_result = str(task_context.get("previous_result") or "None")
         qa_feedback = str(task_context.get("qa_feedback") or "None")
-        required_tools = ", ".join(task.required_tools) if task.required_tools else "none"
+        required_tools = (
+            ", ".join(task.required_tools) if task.required_tools else "none"
+        )
 
         description = (
             "Execute a single atomic task inside the Antigravity task graph.\n\n"
@@ -482,10 +527,10 @@ class CrewAIThreeTierOrchestrator:
         def _runner(llm: LLM) -> str:
             return self._run_single_agent_task(
                 llm=llm,
-                role="Task Graph Worker",
+                role="Task Graph L3 Worker",
                 goal="Complete one atomic task with production-grade output only.",
                 backstory=(
-                    "You are an elite staff engineer executing a validated task graph.\n\n"
+                    "You are an elite L3 leaf worker executing a validated task graph.\n\n"
                     f"{self._worker_tooling_manifest()}"
                 ),
                 description=description,
@@ -496,8 +541,8 @@ class CrewAIThreeTierOrchestrator:
 
         return self._run_stage_with_tier_fallback(
             stage_name=f"task_execute_{task.task_id}",
-            tier_name="level2",
-            tier=self.models.level2,
+            tier_name="level3",
+            tier=self.models.level3,
             runner=_runner,
         )
 
@@ -529,11 +574,11 @@ class CrewAIThreeTierOrchestrator:
         def _runner(llm: LLM) -> str:
             return self._run_single_agent_task(
                 llm=llm,
-                role="Task Graph Evaluator",
+                role="Task Graph L2 Evaluator",
                 goal="Reject incomplete or malformed task outputs before they reach the graph state.",
                 backstory=(
-                    "You are a strict QA evaluator. You do not repair outputs yourself; "
-                    "you return PASS or a single actionable FAIL reason."
+                    "You are a strict L2 coordination and QA agent. You do not repair outputs "
+                    "yourself; you return PASS or a single actionable FAIL reason."
                 ),
                 description=description,
                 expected_output="PASS or FAIL: <reason>",
@@ -541,10 +586,33 @@ class CrewAIThreeTierOrchestrator:
 
         return self._run_stage_with_tier_fallback(
             stage_name=f"task_evaluate_{task.task_id}",
-            tier_name="level1",
-            tier=self.models.level1,
+            tier_name="level2",
+            tier=self.models.level2,
             runner=_runner,
         )
+
+    async def _evaluate_task_graph_worker_output_bounded(
+        self,
+        *,
+        task: WorkerTask,
+        candidate_output: str,
+        task_context: dict[str, Any],
+    ) -> str:
+        if self._level2_evaluator_semaphore is None:
+            return await asyncio.to_thread(
+                self._evaluate_task_graph_worker_output,
+                task=task,
+                candidate_output=candidate_output,
+                task_context=task_context,
+            )
+
+        async with self._level2_evaluator_semaphore:
+            return await asyncio.to_thread(
+                self._evaluate_task_graph_worker_output,
+                task=task,
+                candidate_output=candidate_output,
+                task_context=task_context,
+            )
 
     def _execute_task_graph(
         self,
@@ -563,7 +631,7 @@ class CrewAIThreeTierOrchestrator:
                 context_block=context_block,
                 worker_tools=worker_tools,
             ),
-            evaluation_runner=lambda task, candidate_output, task_context: self._evaluate_task_graph_worker_output(
+            evaluation_runner=lambda task, candidate_output, task_context: self._evaluate_task_graph_worker_output_bounded(
                 task=task,
                 candidate_output=candidate_output,
                 task_context=task_context,
@@ -573,6 +641,7 @@ class CrewAIThreeTierOrchestrator:
         executor = DAGTaskExecutor(
             worker_dispatcher=worker.execute_task,
             event_sink=self._emit_telemetry,
+            max_parallel_tasks=self.models.level3_swarm_count,
         )
         summary = executor.execute_plan_sync(
             plan,
@@ -589,6 +658,8 @@ class CrewAIThreeTierOrchestrator:
                 "parallel_batch_count": summary.parallel_batch_count,
                 "worker_retry_count": summary.worker_retry_count,
                 "task_failure_count": summary.task_failure_count,
+                "level2_swarm_count": self.models.level2_swarm_count,
+                "level3_swarm_count": self.models.level3_swarm_count,
             },
         )
         return summary
@@ -697,7 +768,9 @@ class CrewAIThreeTierOrchestrator:
             runner=_runner,
         )
 
-        write_workspace_file(self.workspace, ".agent/tmp/reconstructed_prompt.md", result)
+        write_workspace_file(
+            self.workspace, ".agent/tmp/reconstructed_prompt.md", result
+        )
         return result
 
     def run_research(self, reconstructed_prompt: str) -> str:
@@ -756,7 +829,9 @@ class CrewAIThreeTierOrchestrator:
         )
 
         normalised = normalize_research_markdown(result)
-        write_workspace_file(self.workspace, ".agent/tmp/research-context.md", normalised)
+        write_workspace_file(
+            self.workspace, ".agent/tmp/research-context.md", normalised
+        )
         return normalised
 
     def execute(
@@ -847,17 +922,28 @@ class CrewAIThreeTierOrchestrator:
             },
         )
 
-        def _build_crew(self_ref: "CrewAIThreeTierOrchestrator", *, use_fallback: bool) -> str:
+        def _build_crew(
+            self_ref: "CrewAIThreeTierOrchestrator", *, use_fallback: bool
+        ) -> str:
             orchestration_llm = (
                 self_ref.models.orchestration.fallback
                 if use_fallback
                 else self_ref.models.orchestration.primary
             )
             level1_llm = (
-                self_ref.models.level1.fallback if use_fallback else self_ref.models.level1.primary
+                self_ref.models.level1.fallback
+                if use_fallback
+                else self_ref.models.level1.primary
             )
             level2_llm = (
-                self_ref.models.level2.fallback if use_fallback else self_ref.models.level2.primary
+                self_ref.models.level2.fallback
+                if use_fallback
+                else self_ref.models.level2.primary
+            )
+            level3_llm = (
+                self_ref.models.level3.fallback
+                if use_fallback
+                else self_ref.models.level3.primary
             )
 
             manager = Agent(
@@ -885,17 +971,31 @@ class CrewAIThreeTierOrchestrator:
                 max_reasoning_attempts=3,
             )
 
+            coordinator = Agent(
+                role="Level 2 Coordination/QA Agent",
+                goal="Validate execution plans, coordinate worker retries, and enforce acceptance criteria.",
+                backstory=(
+                    "You are the L2 coordination tier. You sit between planning and execution, "
+                    "translate work packages for leaf workers, and reject incomplete artefacts."
+                ),
+                llm=level2_llm,
+                verbose=self_ref.verbose,
+                allow_delegation=True,
+                reasoning=True,
+                max_reasoning_attempts=3,
+            )
+
             worker_tools = self_ref._build_worker_tools()
 
             worker = Agent(
-                role="Level 2 Execution/Worker Agent",
+                role="Level 3 Execution/Worker Agent",
                 goal="Implement atomic tasks with zero placeholders and explicit error handling.",
                 backstory=(
-                    "You are an elite staff engineer who produces complete, executable artefacts "
+                    "You are the L3 leaf worker tier that produces complete, executable artefacts "
                     "with no TODOs and no simulated logic.\n\n"
                     f"{self_ref._worker_tooling_manifest()}"
                 ),
-                llm=level2_llm,
+                llm=level3_llm,
                 verbose=self_ref.verbose,
                 allow_delegation=False,
                 tools=worker_tools,
@@ -926,7 +1026,7 @@ class CrewAIThreeTierOrchestrator:
             )
 
             crew = Crew(
-                agents=[senior, worker],
+                agents=[senior, coordinator, worker],
                 tasks=[kickoff_task],
                 process=Process.hierarchical,
                 manager_agent=manager,
@@ -955,7 +1055,9 @@ class CrewAIThreeTierOrchestrator:
             tier_name="orchestration",
             tier=synthetic_tier,
             runner=lambda llm: (
-                _primary_runner(llm) if llm is synthetic_tier.primary else _fallback_runner(llm)
+                _primary_runner(llm)
+                if llm is synthetic_tier.primary
+                else _fallback_runner(llm)
             ),
         )
         return result

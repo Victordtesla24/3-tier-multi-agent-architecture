@@ -4,7 +4,7 @@
 
 This document delivers a rigorous three-phase technical audit of the `Victordtesla24/3-tier-multi-agent-architecture` repository. Phase 1 presents a critical architectural review of the codebase's design, orchestration mechanics, and code quality. Phase 2 constructs a comparative matrix against five industry-standard multi-agent frameworks. Phase 3 provides production-ready, zero-placeholder code enhancements derived directly from the Phase 1 findings.
 
-The target system is a CrewAI-backed multi-agent pipeline with three execution tiers — Orchestration (Gemini / GPT-5.2-Codex), Level 1 analytical (GPT-5.2-Codex / MiniMax), and Level 2 worker (MiniMax / DeepSeek) — featuring a dual-mode execution engine that attempts DAG-based task-graph planning before falling back to a legacy hierarchical Crew.
+The target system is a CrewAI-backed multi-agent pipeline with three execution tiers — Orchestration (GPT-5.2 / GPT-5.2-Codex), Level 1 analytical (Gemini 3 Pro Preview / MiniMax), and Level 2 worker (MiniMax / DeepSeek) — featuring a dual-mode execution engine that attempts DAG-based task-graph planning before falling back to a legacy hierarchical Crew.
 
 ***
 
@@ -14,7 +14,7 @@ The target system is a CrewAI-backed multi-agent pipeline with three execution t
 
 The repository implements a well-segmented pipeline across ~20 Python modules under `src/engine/`. The flow proceeds through five deterministic stages: Prompt Reconstruction → Research → Execution Planning → Task Execution → Synthesis/Verification. The `OrchestrationStateMachine` governs stage transitions, while `CrewAIThreeTierOrchestrator` binds the agent runtime.
 
-The model matrix (`llm_config.py`) hardcodes six `ModelSpec` entries across three tiers, each with a primary/fallback LLM pair. Provider policies use a `ProviderPolicy` dataclass to block incompatible parameters (e.g., `temperature` for GPT-5.2-Codex) and classify error retriability. The `runtime_graph.py` module provides a Pydantic-validated `OrchestrationPlan` with DAG cycle detection, parallel batch execution, and a `ReflexiveTaskWorker` that implements bounded self-correction with exponential backoff.
+The model matrix (`llm_config.py`) hardcodes six active `ModelSpec` entries across three tiers, each with a primary/fallback LLM pair. Provider policies use a `ProviderPolicy` dataclass to block incompatible parameters (for example `temperature` for GPT-5 family models) and classify error retriability. The `runtime_graph.py` module provides a Pydantic-validated `OrchestrationPlan` with DAG cycle detection, parallel batch execution, and a `ReflexiveTaskWorker` that implements bounded self-correction with exponential backoff.
 
 **Strengths:**
 - Clean separation between LLM configuration, orchestration logic, and tool definitions

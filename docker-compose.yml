@@ -5,16 +5,17 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: antigravity_crewai_engine
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - .:/opt/antigravity
       - ./.agent/memory:/root/.agent/memory
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
-      - MINIMAX_API_KEY=${MINIMAX_API_KEY:-}
-      - MINIMAX_BASE_URL=${MINIMAX_BASE_URL:-}
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
-      - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-}
+      - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL_DOCKER:-http://host.docker.internal:11434}
       - CREWAI_STORAGE_DIR=/app/.agent/memory/crewai_storage
     command: uv run python src/orchestrator/antigravity-cli.py --prompt "System Initialization Check" --workspace /opt/antigravity
     restart: unless-stopped

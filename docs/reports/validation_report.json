@@ -1,0 +1,158 @@
+{
+  "active_provider_env_keys": [
+    "GOOGLE_API_KEY",
+    "OPENAI_API_KEY",
+    "OLLAMA_BASE_URL"
+  ],
+  "configured_providers": [
+    {
+      "api_key_configured": true,
+      "api_key_env": "OPENAI_API_KEY",
+      "base_url_env": null,
+      "canonical_base_url": null,
+      "configured_api_key_keys": [
+        "OPENAI_API_KEY"
+      ],
+      "configured_base_url_keys": [],
+      "provider_group": "OpenAI",
+      "resolved_base_url": null
+    },
+    {
+      "api_key_configured": true,
+      "api_key_env": "GOOGLE_API_KEY",
+      "base_url_env": null,
+      "canonical_base_url": null,
+      "configured_api_key_keys": [
+        "GOOGLE_API_KEY"
+      ],
+      "configured_base_url_keys": [],
+      "provider_group": "Google AI",
+      "resolved_base_url": null
+    },
+    {
+      "api_key_configured": true,
+      "api_key_env": null,
+      "base_url_env": "OLLAMA_BASE_URL",
+      "canonical_base_url": "http://127.0.0.1:11434",
+      "configured_api_key_keys": [],
+      "configured_base_url_keys": [
+        "OLLAMA_BASE_URL"
+      ],
+      "provider_group": "Ollama",
+      "resolved_base_url": "http://127.0.0.1:11434"
+    }
+  ],
+  "effective_tier_matrix": {
+    "level1": "openai/gpt-5.2-codex",
+    "level2": "ollama/qwen3:8b",
+    "level3": "ollama/qwen2.5-coder:7b",
+    "orchestration": "gemini/gemini-3.1-pro-preview"
+  },
+  "fallback_topology": {
+    "level1": "gemini/gemini-3.1-pro-preview",
+    "level2": "ollama/qwen3:14b",
+    "level3": "ollama/qwen2.5-coder:14b",
+    "orchestration": "openai/gpt-5.4"
+  },
+  "project_root": "/Users/Shared/antigravity/3-tier-multi-agent-architecture-work",
+  "provider_probe_results": [
+    {
+      "api_key_env": "OPENAI_API_KEY",
+      "base_url_env": null,
+      "canonical_base_url": null,
+      "configured_api_key_keys": [
+        "OPENAI_API_KEY"
+      ],
+      "configured_base_url_keys": [],
+      "failure_classification": null,
+      "http_status": 200,
+      "latency_ms": 1614,
+      "resolved_base_url": null,
+      "response_preview": "{ \"id\": \"chatcmpl-DH0dipZpGRLhrjXrfx4tWNcNy8zAk\", \"object\": \"chat.completion\", \"created\": 1772946406, \"model\": \"gpt-4o-mini-2024-07-18\", \"choices\": [ { \"index\": 0, \"message\": { \"role\": \"assistant\", \"content\": \"ACK\", \"refusal\": null, \"annota",
+      "success": true,
+      "target": {
+        "endpoint": "https://api.openai.com/v1/chat/completions",
+        "method": "POST",
+        "model": "gpt-4o-mini",
+        "probe_name": "chat_completions",
+        "provider_group": "OpenAI",
+        "provider_id": "openai"
+      }
+    },
+    {
+      "api_key_env": "GOOGLE_API_KEY",
+      "base_url_env": null,
+      "canonical_base_url": null,
+      "configured_api_key_keys": [
+        "GOOGLE_API_KEY"
+      ],
+      "configured_base_url_keys": [],
+      "failure_classification": null,
+      "http_status": 200,
+      "latency_ms": 322,
+      "resolved_base_url": null,
+      "response_preview": "{ \"models\": [ { \"name\": \"models/gemini-2.5-flash\", \"version\": \"001\", \"displayName\": \"Gemini 2.5 Flash\", \"description\": \"Stable version of Gemini 2.5 Flash, our mid-size multimodal model that supports up to 1 million tokens, released in June",
+      "success": true,
+      "target": {
+        "endpoint": "https://generativelanguage.googleapis.com/v1beta/models",
+        "method": "GET",
+        "model": null,
+        "probe_name": "models_list",
+        "provider_group": "Google AI",
+        "provider_id": "google"
+      }
+    },
+    {
+      "api_key_env": "GOOGLE_API_KEY",
+      "base_url_env": null,
+      "canonical_base_url": null,
+      "configured_api_key_keys": [
+        "GOOGLE_API_KEY"
+      ],
+      "configured_base_url_keys": [],
+      "failure_classification": null,
+      "http_status": 200,
+      "latency_ms": 3127,
+      "resolved_base_url": null,
+      "response_preview": "{ \"candidates\": [ { \"content\": { \"parts\": [ { \"text\": \"ACK\", \"thoughtSignature\": \"EpEDCo4DAb4+9vsjNaeNtTF7u9XKrBsyvnqS36N4eMFqOzNA5OTQC24ie16l25Bli6so/v8E8eZzJTw135qVVd0TtSuUejigvxJenMYhC5qiZQ40WQ+c41or8dgvft7wTnJWi9kojJfvK4PvZMafQ0DnZE3+OR",
+      "success": true,
+      "target": {
+        "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent",
+        "method": "POST",
+        "model": "gemini-3.1-pro-preview",
+        "probe_name": "generate_content",
+        "provider_group": "Google AI",
+        "provider_id": "google"
+      }
+    },
+    {
+      "api_key_env": null,
+      "base_url_env": "OLLAMA_BASE_URL",
+      "canonical_base_url": "http://127.0.0.1:11434",
+      "configured_api_key_keys": [],
+      "configured_base_url_keys": [
+        "OLLAMA_BASE_URL"
+      ],
+      "failure_classification": null,
+      "http_status": 200,
+      "latency_ms": 3,
+      "resolved_base_url": "http://127.0.0.1:11434",
+      "response_preview": "{\"models\":[]}",
+      "success": true,
+      "target": {
+        "endpoint": "http://127.0.0.1:11434/api/tags",
+        "method": "GET",
+        "model": null,
+        "probe_name": "tags",
+        "provider_group": "Ollama",
+        "provider_id": "ollama"
+      }
+    }
+  ],
+  "swarm_caps": {
+    "level2": 2,
+    "level3": 3
+  },
+  "warnings": [],
+  "workspace": "/Users/Shared/antigravity/3-tier-multi-agent-architecture-work"
+}

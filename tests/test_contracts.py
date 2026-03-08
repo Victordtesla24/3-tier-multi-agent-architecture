@@ -21,10 +21,7 @@ def mock_env():
         {
             "GOOGLE_API_KEY": "dummy",
             "OPENAI_API_KEY": "dummy",
-            "MINIMAX_API_KEY": "dummy",
-            "DEEPSEEK_API_KEY": "dummy",
-            "MINIMAX_BASE_URL": "https://api.minimax.chat/v1",
-            "DEEPSEEK_BASE_URL": "https://api.deepseek.com/v1",
+            "OLLAMA_BASE_URL": "http://127.0.0.1:11434",
         },
     ):
         yield

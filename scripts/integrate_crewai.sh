@@ -8,9 +8,15 @@ echo "======================================================="
 
 # Step 1: Install dependencies (Using /tmp caches to bypass macOS Sandbox permission errors)
 echo "📦 Installing dependencies..."
-export UV_PROJECT_ENVIRONMENT=${UV_PROJECT_ENVIRONMENT:-/tmp/.venv-antigravity}
+export UV_PROJECT_ENVIRONMENT=${UV_PROJECT_ENVIRONMENT:-"$(pwd)/.venv"}
 export UV_CACHE_DIR=${UV_CACHE_DIR:-/tmp/uv-cache}
 env -u VIRTUAL_ENV uv sync --all-extras --python 3.12
+PYTHON_BIN="${UV_PROJECT_ENVIRONMENT}/bin/python"
+if [ ! -x "$PYTHON_BIN" ]; then
+    echo "❌ ERROR: Expected interpreter not found at $PYTHON_BIN"
+    echo "   Remediation: rerun 'uv sync --all-extras --python 3.12' and verify the project virtualenv exists."
+    exit 1
+fi
 
 # Step 2: Verify API keys in .env
 echo "🔑 Verifying API keys..."
@@ -19,20 +25,65 @@ if [ ! -f ".env" ]; then
     exit 1
 fi
 
-required_keys=("GOOGLE_API_KEY" "OPENAI_API_KEY" "MINIMAX_API_KEY" "DEEPSEEK_API_KEY" "MINIMAX_BASE_URL" "DEEPSEEK_BASE_URL")
-for key in "${required_keys[@]}"; do
+PRIMARY_LLM=$(grep -E '^PRIMARY_LLM=' .env | head -1 | cut -d'=' -f2- | tr -d '"' | xargs)
+if [ -z "$PRIMARY_LLM" ]; then
+    PRIMARY_LLM="openai/gpt-5.4"
+fi
+
+declare -a REQUIRED_KEYS=()
+declare -a RUNTIME_WARNINGS=()
+while IFS= read -r key; do
+    [ -n "$key" ] && REQUIRED_KEYS+=("$key")
+done < <(
+    PYTHONPATH=src "$PYTHON_BIN" - "$PRIMARY_LLM" <<'PY'
+import sys
+from engine.runtime_env import resolve_runtime_env
+
+runtime_env = resolve_runtime_env(".", project_root=".", primary_model_id_override=sys.argv[1])
+for key in runtime_env.active_provider_env_keys:
+    print(key)
+print("---WARNINGS---")
+for warning in runtime_env.warnings:
+    print(warning)
+PY
+)
+
+if [ "${#REQUIRED_KEYS[@]}" -gt 0 ]; then
+    LAST_INDEX=$((${#REQUIRED_KEYS[@]} - 1))
+    if [ "${REQUIRED_KEYS[$LAST_INDEX]}" = "---WARNINGS---" ]; then
+        unset 'REQUIRED_KEYS[$LAST_INDEX]'
+    else
+        for i in "${!REQUIRED_KEYS[@]}"; do
+            if [ "${REQUIRED_KEYS[$i]}" = "---WARNINGS---" ]; then
+                RUNTIME_WARNINGS=("${REQUIRED_KEYS[@]:$((i + 1))}")
+                REQUIRED_KEYS=("${REQUIRED_KEYS[@]:0:$i}")
+                break
+            fi
+        done
+    fi
+fi
+
+for warning in "${RUNTIME_WARNINGS[@]}"; do
+    echo "⚠️  WARNING: ${warning}"
+done
+
+for key in "${REQUIRED_KEYS[@]}"; do
     if ! grep -q "^${key}=" .env; then
         echo "⚠️  WARNING: ${key} not found in .env"
     else
-        value=$(grep "^${key}=" .env | cut -d'=' -f2)
-        if [ "$value" = "your_google_api_key_here" ] || [ "$value" = "your_openai_api_key_here" ]; then
+        value=$(grep "^${key}=" .env | cut -d'=' -f2- | tr -d '"' | xargs)
+        if [ "$value" = "your_google_api_key_here" ] \
+            || [ "$value" = "your_deepseek_api_key_here" ] \
+            || [ "$value" = "your_deepseek_base_url_here" ] \
+            || [ "$value" = "your_openai_api_key_here" ] \
+            || [ "$value" = "your_ollama_base_url_here" ]; then
             echo "⚠️  WARNING: ${key} is still set to the template placeholder value"
         fi
     fi
 done
 
 echo "🧪 Validating toolchain compatibility..."
-CREWAI_TOOLS_CHECK=$("${UV_PROJECT_ENVIRONMENT}/bin/python" - 2>&1 <<'PY'
+CREWAI_TOOLS_CHECK=$("$PYTHON_BIN" - 2>&1 <<'PY'
 try:
     from crewai_tools import FileReadTool, FileWriterTool  # noqa: F401
     print("ok")

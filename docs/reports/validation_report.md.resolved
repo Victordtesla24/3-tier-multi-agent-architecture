@@ -1,0 +1,80 @@
+# API Key Validation Report
+
+This report was regenerated from `docs/reports/validation_report.json` after running the updated validator from `/Users/Shared/antigravity/testing_folder`.
+
+## Effective Tier Matrix
+
+- Orchestration: `gemini/gemini-3.1-pro-preview`
+- Level 1: `openai/gpt-5.2-codex`
+- Level 2: `minimax/minimax-m2.5`
+- Level 3: `glm/glm-5`
+
+## Configured Provider Probe Results
+
+1. **`OPENAI_API_KEY` (OpenAI)**: PASS
+   - Probe: `gpt-4o-mini`
+   - Endpoint: `https://api.openai.com/v1/chat/completions`
+   - Result: `200 OK`
+
+2. **`GOOGLE_API_KEY` (Gemini)**: PASS
+   - Probes:
+     - `GET https://generativelanguage.googleapis.com/v1beta/models`
+     - `POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent`
+   - Result: both probes returned `200 OK`
+   - Note: the earlier Gemini failure report was stale. The current key and `gemini-3.1-pro-preview` both validate successfully.
+
+3. **`MINIMAX_API_KEY` (MiniMax)**: FAIL
+   - Probe: `MiniMax-M2.5`
+   - Endpoint: `https://api.minimax.chat/v1/chat/completions`
+   - Result: `401 Unauthorized`
+   - Classification: `auth_invalid`
+   - Exact response preview:
+     ```json
+     {"type":"error","error":{"type":"authorized_error","message":"invalid api key (2049)","http_code":"401"}}
+     ```
+   - Additional note: the current `.env` still points at the legacy `api.minimax.chat` host. The repo defaults were updated to the canonical `https://api.minimax.io/v1`, but this specific credential still must be replaced.
+
+4. **`GLM_API_KEY` (Z.AI GLM)**: FAIL
+   - Probe: `glm-5`
+   - Endpoint: `https://api.z.ai/api/coding/paas/v4/chat/completions`
+   - Result: `401 Unauthorized`
+   - Classification: `auth_invalid`
+   - Exact response preview:
+     ```json
+     {"error":{"code":"1000","message":"Authentication Failed"}}
+     ```
+   - Additional note: the current `.env` still points at the legacy `/api/coding/paas/v4` path. The repo defaults were updated to the canonical `https://api.z.ai/api/paas/v4`, but this credential still must be replaced.
+
+5. **`KIMI_API_KEY` (Kimi)**: FAIL
+   - Probe: `moonshot-v1-auto`
+   - Endpoint: `https://api.kimi.com/coding/v1/chat/completions`
+   - Result: `401 Unauthorized`
+   - Classification: `auth_invalid`
+   - Exact response preview:
+     ```json
+     {"error":{"message":"The API Key appears to be invalid or may have expired. Please verify your credentials and try again.","type":"invalid_authentication_error"}}
+     ```
+   - Additional note: the current `.env` is supplying this credential via the legacy alias `KIMIK_API_KEY` and a custom Kimi base URL. The validator preserved that configured endpoint and proved the credential is rejected there.
+
+6. **`DEEPSEEK_API_KEY` (DeepSeek)**: PASS
+   - Probe: `deepseek-chat`
+   - Endpoint: `https://api.deepseek.com/v1/chat/completions`
+   - Result: `200 OK`
+
+## Active Tier Live Probe
+
+The updated `--live` pass now succeeds for the active Gemini and OpenAI tiers through CrewAI/LiteLLM:
+
+- Orchestration `gemini/gemini-3.1-pro-preview`: PASS
+- Level 1 `openai/gpt-5.2-codex`: PASS
+- Level 2 `minimax/minimax-m2.5`: FAIL (`401`, invalid credential)
+- Level 3 `glm/glm-5`: FAIL (`401`, invalid credential)
+
+## Remaining External Blockers
+
+- Replace `MINIMAX_API_KEY`.
+- Replace `GLM_API_KEY`.
+- Replace `KIMI_API_KEY` or `KIMIK_API_KEY`.
+- Update the external `.env` to canonical provider URLs where appropriate:
+  - `MINIMAX_BASE_URL=https://api.minimax.io/v1`
+  - `GLM_BASE_URL=https://api.z.ai/api/paas/v4`
