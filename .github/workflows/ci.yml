@@ -25,7 +25,7 @@ jobs:
 
       - name: Secret redaction gate (tracked files)
         run: |
-          python - <<'PY'
+          .venv/bin/python - <<'PY'
           import re
           import subprocess
           import sys
@@ -56,7 +56,7 @@ jobs:
 
       - name: Validate Configuration Merger Atomic Safety
         run: |
-          PYTHONPATH=src python src/engine/config_manager.py .agent/tmp/mock_gemini.md
+          PYTHONPATH=src .venv/bin/python src/engine/config_manager.py .agent/tmp/mock_gemini.md
 
       - name: Audit test collection (minimum count gate)
         env:
@@ -68,7 +68,7 @@ jobs:
           DEEPSEEK_BASE_URL: https://api.deepseek.com/v1
         run: |
           cd tests
-          PYTHONPATH=$GITHUB_WORKSPACE/src python -m pytest \
+          PYTHONPATH=$GITHUB_WORKSPACE/src ../.venv/bin/python -m pytest \
             test_architecture.py test_crewai_integration.py test_contracts.py test_cli_runtime.py test_e2e.py \
             --collect-only -q -p no:cacheprovider > /tmp/collect.txt || true
           COUNT=$(grep -c "::" /tmp/collect.txt || true)
@@ -89,7 +89,7 @@ jobs:
           DEEPSEEK_BASE_URL: https://api.deepseek.com/v1
         run: |
           cd tests
-          PYTHONPATH=$GITHUB_WORKSPACE/src python -m pytest \
+          PYTHONPATH=$GITHUB_WORKSPACE/src ../.venv/bin/python -m pytest \
             test_architecture.py test_crewai_integration.py test_contracts.py test_cli_runtime.py test_e2e.py \
             -v -p no:cacheprovider
 
