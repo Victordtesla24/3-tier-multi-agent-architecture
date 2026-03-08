@@ -23,7 +23,8 @@ def merge_config_safely(config_path: str, new_settings: dict) -> None:
     Backs up the existing config first to prevent catastrophic data loss and preserves comments.
     """
     target_file = Path(config_path)
-    
+    target_file.parent.mkdir(parents=True, exist_ok=True)
+
     if not target_file.exists():
         logger.info(f"Configuration file {config_path} not found. Initializing new structure.")
         target_file.touch()
