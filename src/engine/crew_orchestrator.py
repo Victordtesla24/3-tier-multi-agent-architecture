@@ -5,6 +5,7 @@ import logging
 import os
 import re
 import asyncio
+import importlib.util
 from pathlib import Path
 from typing import Any, Callable, Optional
 
@@ -50,6 +51,30 @@ _MODULE_PROJECT_ROOT = Path(__file__).parent.parent.parent.resolve()
 _telemetry_logger = logging.getLogger("AntigravityTelemetry")
 
 
+def resolve_crewai_embedder_config() -> dict[str, Any] | None:
+    """
+    Choose a deterministic CrewAI memory embedder that matches the available
+    provider credentials. Returning None disables CrewAI memory so the runtime
+    does not silently fall back to OpenAI embeddings.
+    """
+    google_api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get(
+        "GOOGLE_API_KEY"
+    )
+    if google_api_key:
+        if importlib.util.find_spec("google.generativeai") is None:
+            return None
+        return {
+            "provider": "google",
+            "config": {
+                "api_key": google_api_key,
+                "model": "models/embedding-001",
+                "task_type": "RETRIEVAL_DOCUMENT",
+            },
+        }
+
+    return None
+
+
 class CrewAIThreeTierOrchestrator:
     """
     CrewAI-backed orchestrator that preserves an explicit orchestration tier plus
@@ -59,7 +84,8 @@ class CrewAIThreeTierOrchestrator:
       - Level 2: coordination/validation agents (Ollama Qwen 3 8B primary → Ollama Qwen 3 14B fallback)
       - Level 3: execution/leaf-worker agents (Ollama Qwen 2.5 Coder 7B primary → Ollama Qwen 2.5 Coder 14B fallback)
 
-    Memory is enabled at Crew level and stored under <workspace>/.agent/memory/crewai_storage.
+    Crew memory is enabled only when a compatible embedder can be configured
+    and is stored under <workspace>/.agent/memory/crewai_storage.
     """
 
     def __init__(
@@ -85,6 +111,7 @@ class CrewAIThreeTierOrchestrator:
         storage_dir = self.workspace / ".agent" / "memory" / "crewai_storage"
         storage_dir.mkdir(parents=True, exist_ok=True)
         os.environ["CREWAI_STORAGE_DIR"] = str(storage_dir)
+        self._crewai_embedder = resolve_crewai_embedder_config()
 
         self.models: ModelMatrix = build_model_matrix(
             self.workspace,
@@ -257,6 +284,9 @@ class CrewAIThreeTierOrchestrator:
         )
         return tools
 
+    def _crew_memory_enabled(self) -> bool:
+        return self._crewai_embedder is not None
+
     def _run_single_agent_task(
         self,
         *,
@@ -293,7 +323,8 @@ class CrewAIThreeTierOrchestrator:
             agents=[agent],
             tasks=[task],
             process=Process.sequential,
-            memory=True,
+            memory=self._crew_memory_enabled(),
+            embedder=self._crewai_embedder,
             verbose=self.verbose,
             cache=True,
         )
@@ -722,6 +753,51 @@ class CrewAIThreeTierOrchestrator:
             runner=_runner,
         )
 
+    @staticmethod
+    def _research_requires_clarification(research_context: str) -> bool:
+        match = re.search(
+            r"## MissingConfig\[\]\s*(.*?)(?:\n## |\Z)",
+            research_context,
+            flags=re.DOTALL | re.IGNORECASE,
+        )
+        if match is None:
+            return False
+
+        items = [
+            line.lstrip("-* ").strip()
+            for line in match.group(1).splitlines()
+            if line.strip()
+        ]
+        return any(item.lower() != "none" for item in items)
+
+    @staticmethod
+    def _is_direct_clarification_payload(reconstructed_prompt: str) -> bool:
+        prompt = reconstructed_prompt.strip()
+        if not prompt or "```" in prompt:
+            return False
+
+        lines = [line.strip() for line in prompt.splitlines() if line.strip()]
+        if not lines:
+            return False
+
+        if all(
+            line.startswith(("-", "*"))
+            or bool(re.match(r"^\d+\.", line))
+            or line.endswith("?")
+            for line in lines
+        ):
+            return True
+
+        lowered = prompt.lower()
+        clarification_markers = (
+            "please provide",
+            "what is",
+            "what are",
+            "missing",
+            "clarify",
+        )
+        return any(marker in lowered for marker in clarification_markers)
+
     def reconstruct_prompt(self, raw_prompt: str) -> str:
         """
         Executes the Prompt Reconstruction Protocol as a CrewAI task using Level 1 models.
@@ -756,7 +832,8 @@ class CrewAIThreeTierOrchestrator:
                 agents=[agent],
                 tasks=[task],
                 process=Process.sequential,
-                memory=True,
+                memory=self._crew_memory_enabled(),
+                embedder=self._crewai_embedder,
                 verbose=self.verbose,
             )
             return str(crew.kickoff())
@@ -816,7 +893,8 @@ class CrewAIThreeTierOrchestrator:
                 agents=[agent],
                 tasks=[task],
                 process=Process.sequential,
-                memory=True,
+                memory=self._crew_memory_enabled(),
+                embedder=self._crewai_embedder,
                 verbose=self.verbose,
             )
             return str(crew.kickoff())
@@ -845,6 +923,19 @@ class CrewAIThreeTierOrchestrator:
         falls back to the legacy hierarchical Crew when graph planning fails
         before any work has started.
         """
+        if self._research_requires_clarification(
+            research_context
+        ) and self._is_direct_clarification_payload(reconstructed_prompt):
+            result = reconstructed_prompt.strip()
+            self._emit_telemetry(
+                "EXECUTION_MODE_SELECTED",
+                {
+                    "execution_mode": "direct_clarification",
+                },
+            )
+            write_workspace_file(self.workspace, ".agent/tmp/final_output.md", result)
+            return result
+
         try:
             plan = self._plan_execution_graph(
                 source_prompt=self._extract_input_data(reconstructed_prompt),
@@ -1030,7 +1121,8 @@ class CrewAIThreeTierOrchestrator:
                 tasks=[kickoff_task],
                 process=Process.hierarchical,
                 manager_agent=manager,
-                memory=True,
+                memory=self._crew_memory_enabled(),
+                embedder=self._crewai_embedder,
                 planning=False,
                 verbose=self_ref.verbose,
                 cache=True,

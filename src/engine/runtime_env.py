@@ -256,6 +256,15 @@ def load_workspace_env(
             "Ensure the file is readable by the current process user."
         ) from exc
 
+    # Keep provider alias env vars in sync so third-party libraries that only
+    # understand one spelling still receive the configured credential.
+    google_key = os.environ.get("GOOGLE_API_KEY")
+    gemini_key = os.environ.get("GEMINI_API_KEY")
+    if google_key and not gemini_key:
+        os.environ["GEMINI_API_KEY"] = google_key
+    elif gemini_key and not google_key:
+        os.environ["GOOGLE_API_KEY"] = gemini_key
+
 
 def normalize_model_identifier(raw: str) -> str:
     cleaned = raw.strip().strip('"').strip("'")
@@ -331,22 +340,34 @@ def _resolve_alias_value(
     aliases: Sequence[str],
 ) -> tuple[str | None, tuple[str, ...]]:
     warnings: list[str] = []
-    canonical_value = os.environ.get(canonical, "").strip()
+    raw_canonical_value = os.environ.get(canonical, "").strip()
+    canonical_value = (
+        raw_canonical_value if _is_configured_env_value(raw_canonical_value) else ""
+    )
     alias_values = {
         alias: os.environ.get(alias, "").strip()
         for alias in aliases
-        if os.environ.get(alias, "").strip()
+        if _is_configured_env_value(os.environ.get(alias, "").strip())
     }
 
     if canonical_value:
-        for alias, alias_value in alias_values.items():
-            if alias_value != canonical_value:
-                raise EnvConfigError(
-                    f"Conflicting values configured for {canonical} and {alias}."
+        for alias in aliases:
+            alias_value = os.environ.get(alias, "").strip()
+            if not alias_value:
+                continue
+            if not _is_configured_env_value(alias_value):
+                warnings.append(
+                    f"Alias '{alias}' uses a placeholder value; using canonical '{canonical}'."
                 )
-            warnings.append(
-                f"Alias '{alias}' duplicates canonical '{canonical}'; using '{canonical}'."
-            )
+                os.environ[alias] = canonical_value
+                continue
+            if alias_value != canonical_value:
+                warnings.append(
+                    f"Alias '{alias}' conflicts with canonical '{canonical}'; using '{canonical}'."
+                )
+                os.environ[alias] = canonical_value
+                continue
+            os.environ[alias] = canonical_value
         os.environ[canonical] = canonical_value
         return canonical_value, tuple(warnings)
 
@@ -356,9 +377,10 @@ def _resolve_alias_value(
     alias, alias_value = next(iter(alias_values.items()))
     for other_alias, other_value in list(alias_values.items())[1:]:
         if other_value != alias_value:
-            raise EnvConfigError(
-                f"Conflicting alias values configured for {alias} and {other_alias}."
+            warnings.append(
+                f"Alias '{other_alias}' conflicts with '{alias}'; using '{alias}' for canonical '{canonical}'."
             )
+            os.environ[other_alias] = alias_value
     os.environ[canonical] = alias_value
     warnings.append(f"Alias '{alias}' normalized to canonical '{canonical}'.")
     return alias_value, tuple(warnings)

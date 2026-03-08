@@ -417,7 +417,7 @@ chmod +x scripts/integrate_crewai.sh
 ./scripts/integrate_crewai.sh
 
 # 5. Audit the active tier matrix and every configured provider credential
-PYTHONPATH=src python scripts/validate_runtime_env.py \
+PYTHONPATH=src uv run python scripts/validate_runtime_env.py \
   --workspace . \
   --project-root . \
   --live \

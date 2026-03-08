@@ -206,6 +206,51 @@ def test_generate_improvement_proposal_reads_task_graph_metrics(tmp_path):
     assert "Workers are retrying 2.0 time(s) per run on average." in proposal
 
 
+def test_generate_improvement_proposal_ignores_missing_stage_durations(tmp_path):
+    workspace = tmp_path / "workspace"
+    log_dir = workspace / ".agent" / "memory"
+    log_dir.mkdir(parents=True)
+    (log_dir / "execution_log.json").write_text(
+        json.dumps(
+            {
+                "executions": [
+                    {
+                        "timestamp": "2026-03-07T00:00:00Z",
+                        "run_id": "run-3",
+                        "state": "ORCHESTRATION_L1",
+                        "event": "PIPELINE_COMPLETE",
+                        "details": {
+                            "success": True,
+                            "completion_status": "success",
+                            "failed_stage": None,
+                            "execution_mode": "task_graph",
+                            "task_count": 1,
+                            "parallel_batch_count": 1,
+                            "worker_retry_count": 0,
+                            "task_failure_count": 0,
+                            "stage_progress": {
+                                "CONTINUOUS_LEARNING": {
+                                    "status": "failed_non_blocking",
+                                    "notes": "TypeError: example",
+                                    "started_at": "2026-03-07T00:00:00Z",
+                                    "finished_at": "2026-03-07T00:00:01Z",
+                                    "duration_s": None,
+                                }
+                            },
+                        },
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    proposal = generate_improvement_proposal(workspace)
+
+    assert "Analyzed 1 recorded pipeline execution(s)" in proposal
+    assert "avg tasks/run 1.0" in proposal
+
+
 def test_project_root_tools_enforce_whitelist(tmp_path):
     project_root = tmp_path / "repo"
     (project_root / "docs" / "architecture").mkdir(parents=True)

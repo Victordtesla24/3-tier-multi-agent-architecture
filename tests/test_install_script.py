@@ -34,6 +34,7 @@ def _prepare_repo_copy(tmp_path: Path) -> Path:
 
     for relative in (
         "install.sh",
+        "scripts/integrate_crewai.sh",
         ".env.template",
         ".agent",
         "docs/architecture",
@@ -41,11 +42,32 @@ def _prepare_repo_copy(tmp_path: Path) -> Path:
         "src/engine/model_catalog.py",
         "src/engine/runtime_env.py",
         "src/engine/config_manager.py",
+        "src/engine/workspace_tools.py",
+        "src/engine/project_root_tools.py",
     ):
         _copy_tree(project_root / relative, repo_copy / relative)
 
     install_path = repo_copy / "install.sh"
     install_path.chmod(install_path.stat().st_mode | stat.S_IXUSR)
+    integrate_path = repo_copy / "scripts" / "integrate_crewai.sh"
+    integrate_path.chmod(integrate_path.stat().st_mode | stat.S_IXUSR)
+
+    test_support = repo_copy / "test_support" / "crewai"
+    test_support.mkdir(parents=True)
+    (test_support / "__init__.py").write_text("", encoding="utf-8")
+    (test_support / "tools.py").write_text(
+        "class BaseTool:\n"
+        "    pass\n",
+        encoding="utf-8",
+    )
+    (repo_copy / "test_support" / "pydantic.py").write_text(
+        "class BaseModel:\n"
+        "    pass\n"
+        "\n"
+        "def Field(default=None, **kwargs):\n"
+        "    return default\n",
+        encoding="utf-8",
+    )
     return repo_copy
 
 
@@ -112,6 +134,31 @@ def _run_installer(
 
     return subprocess.run(
         ["bash", "install.sh"],
+        cwd=repo_copy,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+
+def _run_integrate_crewai(
+    repo_copy: Path,
+    tmp_path: Path,
+) -> subprocess.CompletedProcess[str]:
+    fake_bin = _prepare_fake_bin(tmp_path)
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_bin}{os.pathsep}{env['PATH']}",
+            "PYTHONPATH": str(repo_copy / "test_support"),
+            "UV_FAKE_LOG": str(tmp_path / "uv.log"),
+            "CURL_FAKE_LOG": str(tmp_path / "curl.log"),
+        }
+    )
+
+    return subprocess.run(
+        ["bash", "scripts/integrate_crewai.sh"],
         cwd=repo_copy,
         env=env,
         text=True,
@@ -240,3 +287,25 @@ def test_install_script_normalizes_existing_matrix_and_repairs_missing_newline(
     assert env_payload["L2_AGENT_SWARMS"] == "2"
     assert env_payload["L3_AGENT_SWARMS"] == "3"
     assert env_payload["OLLAMA_BASE_URL"] == "http://127.0.0.1:11434"
+
+
+def test_integrate_crewai_handles_empty_runtime_warnings(tmp_path):
+    repo_copy = _prepare_repo_copy(tmp_path)
+    (repo_copy / ".env").write_text(
+        "\n".join(
+            [
+                'PRIMARY_LLM="gemini/gemini-3.1-pro-preview"',
+                'ORCHESTRATION_MODEL="gemini/gemini-3.1-pro-preview"',
+                'GOOGLE_API_KEY="test-google-key"',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = _run_integrate_crewai(repo_copy, tmp_path)
+
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert "CrewAI integration complete!" in result.stdout
+    assert "❌ ERROR:" not in result.stdout
+    assert "local CrewAI tool compatibility check passed" in result.stdout
