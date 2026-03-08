@@ -9,10 +9,14 @@ from ast import literal_eval
 from engine.orchestration_tools import (
     ACK_ACTION_ID,
     AcknowledgeUIActionTool,
+    MAX_SUBMIT_OBJECTIVE_DEPTH,
+    _ORCHESTRATION_DEPTH_ENV,
     SubmitObjectiveTool,
+    read_runtime_configuration,
 )
 from engine.crew_orchestrator import CrewAIThreeTierOrchestrator
-from view.a2ui_protocol import acknowledgement_visibility_path
+from engine.exceptions import OrchestrationDepthExceeded
+from view.a2ui_protocol import acknowledgement_visibility_path, resolve_acknowledgement_data_model
 
 
 def _dummy_matrix() -> SimpleNamespace:
@@ -20,10 +24,11 @@ def _dummy_matrix() -> SimpleNamespace:
         def __init__(self, model: str):
             self.model = model
 
-    tier = lambda primary, fallback: SimpleNamespace(
-        primary=_LLM(primary),
-        fallback=_LLM(fallback),
-    )
+    def tier(primary: str, fallback: str) -> SimpleNamespace:
+        return SimpleNamespace(
+            primary=_LLM(primary),
+            fallback=_LLM(fallback),
+        )
     return SimpleNamespace(
         orchestration=tier("openai/test-orch", "openai/test-orch-fallback"),
         level1=tier("openai/test-l1", "openai/test-l1-fallback"),
@@ -121,3 +126,78 @@ def test_submit_objective_tool_is_cli_prompt_equivalent(tmp_path, monkeypatch):
     assert result["success"] is True
     assert result["completion_status"] == "success"
     assert Path(result["workspace"]) == tmp_path.resolve()
+
+
+def test_runtime_config_system_env_is_redacted(tmp_path, monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "super-secret-openai")
+    monkeypatch.setenv("GOOGLE_API_KEY", "super-secret-google")
+    monkeypatch.setenv("GEMINI_API_KEY", "super-secret-gemini")
+    monkeypatch.setenv("ANTIGRAVITY_WORKSPACE_DIR", "/tmp/example")
+    payload = read_runtime_configuration(
+        project_root=tmp_path,
+        workspace=tmp_path,
+        include_system_env=True,
+    )
+
+    assert payload["system_env"]["OPENAI_API_KEY"] == "[REDACTED]"
+    assert payload["system_env"]["GOOGLE_API_KEY"] == "[REDACTED]"
+    assert payload["system_env"]["GEMINI_API_KEY"] == "[REDACTED]"
+    assert payload["system_env"]["ANTIGRAVITY_WORKSPACE_DIR"] == "/tmp/example"
+
+
+def test_submit_objective_rejects_excessive_recursion_depth(tmp_path, monkeypatch):
+    monkeypatch.setenv(_ORCHESTRATION_DEPTH_ENV, str(MAX_SUBMIT_OBJECTIVE_DEPTH))
+    tool = SubmitObjectiveTool(workspace=str(tmp_path))
+
+    try:
+        tool._run(prompt="nested objective")
+        assert False, "Expected OrchestrationDepthExceeded"
+    except OrchestrationDepthExceeded as exc:
+        assert exc.depth == MAX_SUBMIT_OBJECTIVE_DEPTH
+
+
+def test_submit_objective_logs_blocked_nested_attempt(tmp_path, monkeypatch, caplog):
+    monkeypatch.setenv(_ORCHESTRATION_DEPTH_ENV, str(MAX_SUBMIT_OBJECTIVE_DEPTH))
+    tool = SubmitObjectiveTool(workspace=str(tmp_path))
+
+    with caplog.at_level("WARNING"):
+        try:
+            tool._run(prompt="nested objective")
+            assert False, "Expected OrchestrationDepthExceeded"
+        except OrchestrationDepthExceeded:
+            pass
+
+    assert "SUBMIT_OBJECTIVE_BLOCKED_NESTED" in caplog.text
+
+
+def test_resolve_ack_data_model_uses_persisted_workspace_state(tmp_path):
+    state_file = tmp_path / ".agent" / "memory" / "a2ui_state.json"
+    state_file.parent.mkdir(parents=True, exist_ok=True)
+    pointer = acknowledgement_visibility_path(ACK_ACTION_ID)
+    state_file.write_text(
+        json.dumps({"data_model": {pointer: False}}, indent=2),
+        encoding="utf-8",
+    )
+
+    data_model = resolve_acknowledgement_data_model({"workspace": str(tmp_path)})
+    assert data_model[pointer] is False
+
+
+def test_acknowledge_tool_logs_and_recovers_corrupt_state(tmp_path, caplog):
+    state_file = tmp_path / ".agent" / "memory" / "a2ui_state.json"
+    state_file.parent.mkdir(parents=True, exist_ok=True)
+    pointer = acknowledgement_visibility_path(ACK_ACTION_ID)
+    state_file.write_text(
+        '{"data_model":{"%s": false},"last_action":{"action_id":"%s"}}BROKEN'
+        % (pointer, ACK_ACTION_ID),
+        encoding="utf-8",
+    )
+
+    tool = AcknowledgeUIActionTool(workspace=str(tmp_path))
+    with caplog.at_level("ERROR"):
+        result = literal_eval(tool._run(action_id=ACK_ACTION_ID, acknowledged=False))
+
+    assert "A2UI_STATE_CORRUPT_RECOVERED" in caplog.text
+    payload = json.loads(state_file.read_text(encoding="utf-8"))
+    assert payload["data_model"][pointer] is True
+    assert result["visibility"] is True

@@ -80,3 +80,19 @@ class ResearchEmptyError(PipelineError):
 
     def __init__(self, message: str = "Research stage returned empty or non-actionable content."):
         super().__init__(message, stage="research")
+
+
+class OrchestrationDepthExceeded(PipelineError):
+    """Raised when nested objective submission exceeds allowed recursion depth."""
+
+    def __init__(self, *, depth: int, max_depth: int):
+        super().__init__(
+            (
+                "Nested orchestration depth exceeded for submit_objective "
+                f"(depth={depth}, max_depth={max_depth})."
+            ),
+            stage="execution",
+            metadata={"depth": depth, "max_depth": max_depth},
+        )
+        self.depth = depth
+        self.max_depth = max_depth

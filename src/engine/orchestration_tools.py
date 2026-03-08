@@ -5,16 +5,21 @@ import subprocess
 import sys
 import time
 import json
+import logging
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Literal, Mapping, Type
 
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
+from engine.exceptions import OrchestrationDepthExceeded
 from view.a2ui_protocol import (
     ACK_ACTION_ID,
     acknowledgement_visibility_path,
     apply_acknowledgement_update,
 )
+
+_tooling_logger = logging.getLogger("AntigravityTooling")
 
 
 def _default_test_command(project_root: Path) -> list[str]:
@@ -135,6 +140,25 @@ _MUTABLE_ENV_KEYS = {
     "OLLAMA_BASE_URL",
 }
 
+_SENSITIVE_ENV_MARKERS = ("API_KEY", "SECRET", "TOKEN", "PASSWORD", "PRIVATE_KEY")
+# Worker-facing submit_objective must never recursively fan out beyond one level.
+# depth=0 -> allowed (single submission), depth>=1 -> blocked.
+MAX_SUBMIT_OBJECTIVE_DEPTH = 1
+_ORCHESTRATION_DEPTH_ENV = "ANTIGRAVITY_ORCHESTRATION_DEPTH"
+
+
+def _is_sensitive_env_key(key: str) -> bool:
+    upper = key.upper()
+    return any(marker in upper for marker in _SENSITIVE_ENV_MARKERS)
+
+
+def _redact_env_entry(key: str, value: str | None) -> str:
+    if value is None:
+        return ""
+    if _is_sensitive_env_key(key):
+        return "[REDACTED]"
+    return value
+
 
 def read_runtime_configuration(
     *,
@@ -166,7 +190,7 @@ def read_runtime_configuration(
     }
     if include_system_env:
         payload["system_env"] = {
-            key: os.environ.get(key)
+            key: _redact_env_entry(key, os.environ.get(key))
             for key in _RUNTIME_KEYS
             if os.environ.get(key) is not None
         }
@@ -229,10 +253,23 @@ def acknowledge_ui_action(
     workspace = workspace.resolve()
     state_file = workspace / ".agent" / "memory" / "a2ui_state.json"
     if state_file.exists():
+        raw_state = state_file.read_text(encoding="utf-8")
         try:
-            payload = json.loads(state_file.read_text(encoding="utf-8"))
-        except Exception:
-            payload = {}
+            payload = json.loads(raw_state)
+        except Exception as exc:
+            pointer = acknowledgement_visibility_path(action_id)
+            payload = _recover_state_payload_from_corruption(
+                raw_state,
+                pointer=pointer,
+                action_id=action_id,
+            )
+            snippet = raw_state[:240].replace("\n", "\\n")
+            _tooling_logger.error(
+                "A2UI_STATE_CORRUPT_RECOVERED path=%s error=%s snippet=%s",
+                state_file,
+                f"{type(exc).__name__}: {exc}",
+                snippet,
+            )
     else:
         payload = {}
 
@@ -277,6 +314,15 @@ def submit_objective(
     """Programmatic equivalent of CLI objective submission."""
     from engine.orchestration_api import OrchestrationRunConfig, run_orchestration
 
+    depth = _current_orchestration_depth()
+    if depth >= MAX_SUBMIT_OBJECTIVE_DEPTH:
+        _tooling_logger.warning(
+            "SUBMIT_OBJECTIVE_BLOCKED_NESTED depth=%s max_depth=%s",
+            depth,
+            MAX_SUBMIT_OBJECTIVE_DEPTH,
+        )
+        raise OrchestrationDepthExceeded(depth=depth, max_depth=MAX_SUBMIT_OBJECTIVE_DEPTH)
+
     cfg = OrchestrationRunConfig(
         prompt=prompt,
         workspace=workspace.resolve(),
@@ -286,7 +332,8 @@ def submit_objective(
         verbose=verbose,
         caller="internal",
     )
-    result = run_orchestration(cfg)
+    with _scoped_orchestration_depth(depth + 1):
+        result = run_orchestration(cfg)
     return {
         "success": result.success,
         "workspace": str(result.workspace),
@@ -300,6 +347,75 @@ def submit_objective(
         "failed_stage": result.failed_stage,
         "error": result.error,
     }
+
+
+def _recover_state_payload_from_corruption(
+    raw_state: str,
+    *,
+    pointer: str,
+    action_id: str,
+) -> dict[str, Any]:
+    recovered: dict[str, Any] = {"data_model": {}}
+    data_model_match = _extract_object_for_key(raw_state, "data_model")
+    if data_model_match is not None and isinstance(data_model_match, dict):
+        recovered["data_model"] = data_model_match
+    if pointer not in recovered["data_model"]:
+        recovered["data_model"] = apply_acknowledgement_update(
+            recovered["data_model"],
+            action_id=action_id,
+            acknowledged=False,
+        )
+    last_action_match = _extract_object_for_key(raw_state, "last_action")
+    if isinstance(last_action_match, dict):
+        recovered["last_action"] = last_action_match
+    return recovered
+
+
+def _extract_object_for_key(raw_text: str, key: str) -> dict[str, Any] | None:
+    marker = f'"{key}"'
+    marker_index = raw_text.find(marker)
+    if marker_index == -1:
+        return None
+    brace_start = raw_text.find("{", marker_index)
+    if brace_start == -1:
+        return None
+    depth = 0
+    for idx in range(brace_start, len(raw_text)):
+        char = raw_text[idx]
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                candidate = raw_text[brace_start : idx + 1]
+                try:
+                    payload = json.loads(candidate)
+                except Exception:
+                    return None
+                return payload if isinstance(payload, dict) else None
+    return None
+
+
+def _current_orchestration_depth() -> int:
+    raw = os.environ.get(_ORCHESTRATION_DEPTH_ENV, "0").strip()
+    try:
+        depth = int(raw)
+    except ValueError:
+        return 0
+    return max(depth, 0)
+
+
+@contextmanager
+def _scoped_orchestration_depth(depth: int):
+    previous = os.environ.get(_ORCHESTRATION_DEPTH_ENV)
+    os.environ[_ORCHESTRATION_DEPTH_ENV] = str(max(depth, 0))
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop(_ORCHESTRATION_DEPTH_ENV, None)
+        else:
+            os.environ[_ORCHESTRATION_DEPTH_ENV] = previous
 
 
 class _RunTestsArgs(BaseModel):

@@ -10,6 +10,8 @@ stream, thereby preventing client-side rendering crashes.
 
 import json
 import logging
+import os
+from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, ValidationError
@@ -39,6 +41,46 @@ def apply_acknowledgement_update(
     updated = dict(data_model)
     updated[acknowledgement_visibility_path(action_id)] = not acknowledged
     return updated
+
+
+def _load_persisted_data_model(workspace_hint: str | None) -> Dict[str, Any]:
+    if not workspace_hint:
+        return {}
+    state_file = Path(workspace_hint).resolve() / ".agent" / "memory" / "a2ui_state.json"
+    if not state_file.exists():
+        return {}
+    try:
+        payload = json.loads(state_file.read_text(encoding="utf-8"))
+    except Exception as exc:
+        logger.warning("A2UI state load failed at %s: %s", state_file, exc)
+        return {}
+    data_model = payload.get("data_model", {})
+    return data_model if isinstance(data_model, dict) else {}
+
+
+def resolve_acknowledgement_data_model(raw_controller_state: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Build the outbound data-model payload from the canonical shared state first.
+    Falls back to default visible acknowledgement only when state is absent.
+    """
+    merged: Dict[str, Any] = {}
+    state_data = raw_controller_state.get("data_model", {})
+    if isinstance(state_data, dict):
+        merged.update(state_data)
+
+    workspace_hint = (
+        str(raw_controller_state.get("workspace") or "").strip()
+        or str(raw_controller_state.get("workspace_dir") or "").strip()
+        or os.environ.get("ANTIGRAVITY_WORKSPACE_DIR", "").strip()
+        or None
+    )
+    persisted = _load_persisted_data_model(workspace_hint)
+    merged.update(persisted)
+
+    pointer = acknowledgement_visibility_path()
+    if pointer not in merged:
+        merged = apply_acknowledgement_update(merged, action_id=ACK_ACTION_ID, acknowledged=False)
+    return merged
 
 
 class A2UIComponent(BaseModel):
@@ -184,7 +226,7 @@ class A2UIViewAgent:
         # 2. Construct and Yield the Data Model Update (State binding)
         data_model = DataModelUpdateMessage(
             surfaceId=self.surface_id,
-            data=apply_acknowledgement_update({}, action_id=ACK_ACTION_ID, acknowledged=False),
+            data=resolve_acknowledgement_data_model(raw_controller_state),
         )
         yield self._validate_and_serialize(data_model) + "\n"
 

@@ -456,7 +456,7 @@ uv run python src/orchestrator/antigravity-cli.py \
   --verbose
 ```
 
-> **Important:** The `--workspace` flag is **optional**. When omitted, the CLI resolves the workspace in this order: (1) `ANTIGRAVITY_WORKSPACE_DIR` environment variable, (2) `<project_root>/workspaces/cli-default`.
+> **Important:** The `--workspace` flag is **optional**. When omitted, the CLI resolves the workspace in this order: (1) `ANTIGRAVITY_WORKSPACE_DIR` environment variable, (2) `ANTIGRAVITY_WORKSPACE_ROOT` environment variable, (3) `<project_root>`.
 
 ```bash
 # Run the full test suite
