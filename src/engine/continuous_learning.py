@@ -76,7 +76,10 @@ def _compute_stage_latencies(executions: List[Dict[str, Any]]) -> Dict[str, List
         if isinstance(stage_progress, dict):
             for stage_name, stage_data in stage_progress.items():
                 if isinstance(stage_data, dict) and "duration_s" in stage_data:
-                    duration = float(stage_data["duration_s"])
+                    raw_duration = stage_data["duration_s"]
+                    if raw_duration is None:
+                        continue
+                    duration = float(raw_duration)
                     latencies.setdefault(stage_name, []).append(duration)
     return latencies
 

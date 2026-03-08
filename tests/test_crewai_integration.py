@@ -373,6 +373,87 @@ class TestUtilities:
 
             assert os.environ.get("ANTIGRAVITY_TEST_ENV") == "workspace"
 
+    def test_load_workspace_env_populates_google_aliases(self, tmp_path):
+        from engine.llm_config import load_workspace_env
+
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        (workspace / ".env").write_text(
+            "GOOGLE_API_KEY=real_google\n",
+            encoding="utf-8",
+        )
+
+        with patch.dict("os.environ", {}, clear=True):
+            load_workspace_env(workspace)
+            import os
+
+            assert os.environ.get("GOOGLE_API_KEY") == "real_google"
+            assert os.environ.get("GEMINI_API_KEY") == "real_google"
+
+    def test_load_workspace_env_backfills_google_from_gemini_alias(self, tmp_path):
+        from engine.llm_config import load_workspace_env
+
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        (workspace / ".env").write_text(
+            "GEMINI_API_KEY=real_google\n",
+            encoding="utf-8",
+        )
+
+        with patch.dict("os.environ", {}, clear=True):
+            load_workspace_env(workspace)
+            import os
+
+            assert os.environ.get("GEMINI_API_KEY") == "real_google"
+            assert os.environ.get("GOOGLE_API_KEY") == "real_google"
+
+    def test_placeholder_gemini_alias_does_not_conflict_with_google_key(self, tmp_path):
+        from engine.runtime_env import resolve_runtime_env
+
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        (workspace / ".env").write_text(
+            "\n".join(
+                [
+                    "GOOGLE_API_KEY=real_google",
+                    "GEMINI_API_KEY=your_google_api_key_here",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        with patch.dict("os.environ", {}, clear=True):
+            resolved = resolve_runtime_env(workspace)
+            import os
+
+            assert os.environ.get("GOOGLE_API_KEY") == "real_google"
+            assert os.environ.get("GEMINI_API_KEY") == "real_google"
+            assert "GOOGLE_API_KEY" in resolved.active_provider_env_keys
+
+    def test_google_alias_backfill_does_not_emit_false_duplicate_warning(
+        self, tmp_path
+    ):
+        from engine.runtime_env import resolve_runtime_env
+
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        (workspace / ".env").write_text(
+            "GOOGLE_API_KEY=real_google\n",
+            encoding="utf-8",
+        )
+
+        with patch.dict("os.environ", {}, clear=True):
+            resolved = resolve_runtime_env(workspace)
+            import os
+
+            assert os.environ.get("GOOGLE_API_KEY") == "real_google"
+            assert os.environ.get("GEMINI_API_KEY") == "real_google"
+            assert not any(
+                "duplicates canonical 'GOOGLE_API_KEY'" in warning
+                for warning in resolved.warnings
+            )
+
     def test_validate_provider_runtime_env_rejects_placeholder(self):
         from engine.llm_config import validate_provider_runtime_env, EnvConfigError
 
@@ -508,6 +589,60 @@ class TestUtilities:
         assert providers["Ollama"].configured_api_key_keys == ()
         assert providers["Ollama"].configured_base_url_keys == ("OLLAMA_BASE_URL",)
         assert providers["Ollama"].resolved_base_url == "http://127.0.0.1:11434"
+
+    def test_resolve_crewai_embedder_config_prefers_google(self, monkeypatch):
+        from engine.crew_orchestrator import resolve_crewai_embedder_config
+
+        monkeypatch.setattr(
+            "engine.crew_orchestrator.importlib.util.find_spec",
+            lambda name: object() if name == "google.generativeai" else None,
+        )
+        with patch.dict(
+            "os.environ",
+            {
+                "OPENAI_API_KEY": "real_openai",
+                "GOOGLE_API_KEY": "real_google",
+            },
+            clear=True,
+        ):
+            embedder = resolve_crewai_embedder_config()
+
+        assert embedder == {
+            "provider": "google",
+            "config": {
+                "api_key": "real_google",
+                "model": "models/embedding-001",
+                "task_type": "RETRIEVAL_DOCUMENT",
+            },
+        }
+
+    def test_resolve_crewai_embedder_config_disables_memory_without_google(self):
+        from engine.crew_orchestrator import resolve_crewai_embedder_config
+
+        with patch.dict(
+            "os.environ",
+            {
+                "OPENAI_API_KEY": "real_openai",
+            },
+            clear=True,
+        ):
+            embedder = resolve_crewai_embedder_config()
+
+        assert embedder is None
+
+    def test_resolve_crewai_embedder_config_disables_memory_without_google_sdk(self):
+        from engine.crew_orchestrator import resolve_crewai_embedder_config
+
+        with patch.dict(
+            "os.environ",
+            {
+                "GOOGLE_API_KEY": "real_google",
+            },
+            clear=True,
+        ):
+            embedder = resolve_crewai_embedder_config()
+
+        assert embedder is None
 
     def test_gpt5_provider_policy_blocks_temperature(self):
         from engine.llm_config import get_provider_policy

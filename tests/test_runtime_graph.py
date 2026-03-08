@@ -385,3 +385,51 @@ def test_execute_falls_back_to_legacy_when_planning_fails(tmp_path, monkeypatch)
         and details.get("execution_mode") == "legacy_hierarchical"
         for event, details in events
     )
+
+
+def test_execute_short_circuits_direct_clarification(tmp_path, monkeypatch):
+    events: list[tuple[str, dict[str, object]]] = []
+    monkeypatch.setattr("engine.crew_orchestrator._MODULE_PROJECT_ROOT", tmp_path)
+    orchestrator = CrewAIThreeTierOrchestrator(
+        workspace_dir=str(tmp_path),
+        verbose=False,
+        telemetry_hook=lambda event_type, details: events.append((event_type, details)),
+    )
+
+    monkeypatch.setattr(
+        orchestrator,
+        "_plan_execution_graph",
+        lambda **_kwargs: pytest.fail("task graph should not be planned"),
+    )
+    monkeypatch.setattr(
+        orchestrator,
+        "_execute_hierarchical_legacy",
+        lambda **_kwargs: pytest.fail("legacy path should not be used"),
+    )
+
+    reconstructed_prompt = (
+        "- What is the complete and exact <input_data> content to reconstruct into the "
+        "production-grade system prompt?"
+    )
+    research_context = (
+        "## Summary\n"
+        "- Missing required task inputs.\n\n"
+        "## Citations[]\n"
+        "- None\n\n"
+        "## MissingConfig[]\n"
+        "- The exact <input_data> content to reconstruct.\n\n"
+        "## RiskNotes[]\n"
+        "- Proceeding would fabricate requirements.\n"
+    )
+
+    result = orchestrator.execute(reconstructed_prompt, research_context, "ctx")
+
+    assert result == reconstructed_prompt
+    assert (tmp_path / ".agent" / "tmp" / "final_output.md").read_text(
+        encoding="utf-8"
+    ) == reconstructed_prompt
+    assert any(
+        event == "EXECUTION_MODE_SELECTED"
+        and details.get("execution_mode") == "direct_clarification"
+        for event, details in events
+    )

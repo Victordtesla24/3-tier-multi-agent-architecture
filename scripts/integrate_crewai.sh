@@ -32,8 +32,18 @@ fi
 
 declare -a REQUIRED_KEYS=()
 declare -a RUNTIME_WARNINGS=()
+CAPTURE_MODE="keys"
 while IFS= read -r key; do
-    [ -n "$key" ] && REQUIRED_KEYS+=("$key")
+    if [ "$key" = "---WARNINGS---" ]; then
+        CAPTURE_MODE="warnings"
+        continue
+    fi
+    [ -z "$key" ] && continue
+    if [ "$CAPTURE_MODE" = "keys" ]; then
+        REQUIRED_KEYS+=("$key")
+    else
+        RUNTIME_WARNINGS+=("$key")
+    fi
 done < <(
     PYTHONPATH=src "$PYTHON_BIN" - "$PRIMARY_LLM" <<'PY'
 import sys
@@ -48,24 +58,11 @@ for warning in runtime_env.warnings:
 PY
 )
 
-if [ "${#REQUIRED_KEYS[@]}" -gt 0 ]; then
-    LAST_INDEX=$((${#REQUIRED_KEYS[@]} - 1))
-    if [ "${REQUIRED_KEYS[$LAST_INDEX]}" = "---WARNINGS---" ]; then
-        unset 'REQUIRED_KEYS[$LAST_INDEX]'
-    else
-        for i in "${!REQUIRED_KEYS[@]}"; do
-            if [ "${REQUIRED_KEYS[$i]}" = "---WARNINGS---" ]; then
-                RUNTIME_WARNINGS=("${REQUIRED_KEYS[@]:$((i + 1))}")
-                REQUIRED_KEYS=("${REQUIRED_KEYS[@]:0:$i}")
-                break
-            fi
-        done
-    fi
+if [ "${#RUNTIME_WARNINGS[@]}" -gt 0 ]; then
+    for warning in "${RUNTIME_WARNINGS[@]}"; do
+        echo "⚠️  WARNING: ${warning}"
+    done
 fi
-
-for warning in "${RUNTIME_WARNINGS[@]}"; do
-    echo "⚠️  WARNING: ${warning}"
-done
 
 for key in "${REQUIRED_KEYS[@]}"; do
     if ! grep -q "^${key}=" .env; then
@@ -83,9 +80,16 @@ for key in "${REQUIRED_KEYS[@]}"; do
 done
 
 echo "🧪 Validating toolchain compatibility..."
-CREWAI_TOOLS_CHECK=$("$PYTHON_BIN" - 2>&1 <<'PY'
+CREWAI_TOOLS_CHECK=$(PYTHONPATH="src${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" - 2>&1 <<'PY'
 try:
-    from crewai_tools import FileReadTool, FileWriterTool  # noqa: F401
+    from engine.project_root_tools import (  # noqa: F401
+        ProjectRootFileReadTool,
+        ProjectRootFileWriteTool,
+    )
+    from engine.workspace_tools import (  # noqa: F401
+        WorkspaceFileReadTool,
+        WorkspaceFileWriteTool,
+    )
     print("ok")
 except ImportError as exc:
     print(f"IMPORT_ERROR: {exc}")
@@ -95,13 +99,13 @@ PY
 )
 
 if echo "$CREWAI_TOOLS_CHECK" | grep -q "^ok"; then
-    echo "✅ crewai_tools import check passed"
+    echo "✅ local CrewAI tool compatibility check passed"
 elif echo "$CREWAI_TOOLS_CHECK" | grep -q "^IMPORT_ERROR"; then
-    echo "❌ ERROR: crewai_tools import failed — ${CREWAI_TOOLS_CHECK}"
-    echo "   Remediation: Run 'uv add --upgrade crewai-tools' or check installed crewai version."
-    echo "   The local workspace tool fallback will be used at runtime, but production tool availability is degraded."
+    echo "❌ ERROR: local CrewAI tool compatibility check failed — ${CREWAI_TOOLS_CHECK}"
+    echo "   Remediation: rerun 'uv sync --all-extras --python 3.12' and verify the project dependencies installed correctly."
+    exit 1
 else
-    echo "⚠️  WARNING: crewai_tools check returned unexpected output: ${CREWAI_TOOLS_CHECK}"
+    echo "⚠️  WARNING: tool compatibility check returned unexpected output: ${CREWAI_TOOLS_CHECK}"
 fi
 
 # Step 3: Verify directory structure
