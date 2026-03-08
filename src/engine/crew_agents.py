@@ -16,7 +16,7 @@ class L3LeafWorkerAgent:
             CRITICAL DIRECTIVE: Never return TODO, placeholder, or simulated code.
             All code must be complete, functional, and ready for production deployment.
             Enforce strict code verification before returning results.""",
-            llm=LLMProvider.get_l2_llm(),
+            llm=LLMProvider.get_l3_llm(),
             verbose=True,
             allow_delegation=False  # Leaf workers never delegate
         )
@@ -29,7 +29,7 @@ class L3LeafWorkerAgent:
             goal="Perform precise file create/read/update/delete operations",
             backstory="""You specialize in file system operations with atomic precision.
             You maintain single source of truth and eliminate duplicate files.""",
-            llm=LLMProvider.get_l2_llm(),
+            llm=LLMProvider.get_l3_llm(),
             verbose=True,
             allow_delegation=False
         )
@@ -42,7 +42,7 @@ class L3LeafWorkerAgent:
             goal="Validate outputs meet production standards with zero tolerance for errors",
             backstory="""You validate all outputs against strict production criteria.
             You reject any simulated code, incomplete implementations, or placeholders.""",
-            llm=LLMProvider.get_l2_llm(),
+            llm=LLMProvider.get_l3_llm(),
             verbose=True,
             allow_delegation=False
         )
@@ -59,7 +59,7 @@ class L2SubAgents:
             goal="Gather comprehensive requirements and constraints from verified sources",
             backstory="""You coordinate research activities and constraint analysis.
             You delegate to L3 workers for specific research tasks and synthesize findings.""",
-            llm=LLMProvider.get_l1_llm(),
+            llm=LLMProvider.get_l2_llm(),
             verbose=True,
             allow_delegation=True  # Can delegate to L3
         )
@@ -73,7 +73,7 @@ class L2SubAgents:
             backstory="""You coordinate code generation and implementation tasks.
             You delegate atomic tasks to L3 workers and validate their outputs.
             Maximum 3 retry iterations on L3 failures.""",
-            llm=LLMProvider.get_l1_llm(),
+            llm=LLMProvider.get_l2_llm(),
             verbose=True,
             allow_delegation=True,
             max_retry_limit=3
@@ -87,7 +87,7 @@ class L2SubAgents:
             goal="Ensure zero-defect outputs through comprehensive validation",
             backstory="""You coordinate quality assurance and testing activities.
             You delegate validation tasks to L3 workers and enforce strict standards.""",
-            llm=LLMProvider.get_l1_llm(),
+            llm=LLMProvider.get_l2_llm(),
             verbose=True,
             allow_delegation=True
         )

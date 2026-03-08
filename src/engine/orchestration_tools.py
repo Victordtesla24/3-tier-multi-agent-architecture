@@ -96,26 +96,37 @@ def complete_task_signal(
 
 
 _RUNTIME_KEYS = (
+    "PRIMARY_LLM",
+    "ORCHESTRATION_MODEL",
+    "L1_MODEL",
+    "L2_MODEL",
+    "L3_MODEL",
+    "L2_AGENT_SWARMS",
+    "L3_AGENT_SWARMS",
     "OPENAI_API_KEY",
     "GOOGLE_API_KEY",
-    "MINIMAX_API_KEY",
-    "MINIMAX_BASE_URL",
-    "DEEPSEEK_API_KEY",
-    "DEEPSEEK_BASE_URL",
+    "GEMINI_API_KEY",
+    "OLLAMA_BASE_URL",
     "ANTIGRAVITY_WORKSPACE_DIR",
     "ANTIGRAVITY_WORKSPACE_ROOT",
     "CREWAI_STORAGE_DIR",
 )
 
 _MUTABLE_ENV_KEYS = {
+    "PRIMARY_LLM",
+    "ORCHESTRATION_MODEL",
+    "L1_MODEL",
+    "L2_MODEL",
+    "L3_MODEL",
+    "L2_AGENT_SWARMS",
+    "L3_AGENT_SWARMS",
     "ANTIGRAVITY_WORKSPACE_DIR",
     "ANTIGRAVITY_WORKSPACE_ROOT",
     "CREWAI_STORAGE_DIR",
     "ANTIGRAVITY_STRICT_PROVIDER_VALIDATION",
     "ANTIGRAVITY_MAX_PROVIDER_4XX",
     "ANTIGRAVITY_FAIL_ON_RESEARCH_EMPTY",
-    "MINIMAX_BASE_URL",
-    "DEEPSEEK_BASE_URL",
+    "OLLAMA_BASE_URL",
 }
 
 
@@ -200,7 +211,13 @@ class _RunBenchmarksArgs(BaseModel):
 
 
 class _ReadConfigArgs(BaseModel):
-    pass
+    include_system_env: bool = Field(
+        default=False,
+        description=(
+            "When True, augments the configuration snapshot with a subset of "
+            "system environment variables relevant to runtime behaviour."
+        ),
+    )
 
 
 class _UpdateConfigArgs(BaseModel):

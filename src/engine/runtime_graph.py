@@ -253,6 +253,16 @@ async def _resolve(value: Awaitable[str] | str) -> str:
     return str(value)
 
 
+async def _invoke_runner(
+    runner: Callable[..., Awaitable[str] | str],
+    *args: Any,
+) -> str:
+    if inspect.iscoroutinefunction(runner):
+        return await _resolve(runner(*args))
+    result = await asyncio.to_thread(runner, *args)
+    return await _resolve(result)
+
+
 class ReflexiveTaskWorker:
     """Execute and validate atomic tasks with bounded self-correction."""
 
@@ -285,10 +295,15 @@ class ReflexiveTaskWorker:
             attempt_context["qa_feedback"] = qa_feedback
 
             try:
-                current_result = (await _resolve(self.execution_runner(task, attempt_context))).strip()
+                current_result = (
+                    await _invoke_runner(self.execution_runner, task, attempt_context)
+                ).strip()
                 evaluation = (
-                    await _resolve(
-                        self.evaluation_runner(task, current_result, attempt_context)
+                    await _invoke_runner(
+                        self.evaluation_runner,
+                        task,
+                        current_result,
+                        attempt_context,
                     )
                 ).strip()
 
@@ -329,10 +344,12 @@ class DAGTaskExecutor:
         worker_dispatcher: Callable[[WorkerTask, dict[str, Any]], Awaitable[WorkerTask]],
         event_sink: TaskEventSink | None = None,
         task_timeout_seconds: float = 300.0,
+        max_parallel_tasks: int | None = None,
     ):
         self.worker_dispatcher = worker_dispatcher
         self.event_sink = event_sink
         self.task_timeout_seconds = task_timeout_seconds
+        self.max_parallel_tasks = max_parallel_tasks
 
     def _emit(self, event_type: str, details: dict[str, Any]) -> None:
         if self.event_sink is None:
@@ -379,93 +396,99 @@ class DAGTaskExecutor:
                     started_execution=started_execution,
                 )
 
-            batch_count += 1
-            started_execution = True
-            for task in ready:
-                pending.pop(task.task_id, None)
-                task.status = TaskStatus.IN_PROGRESS
+            chunk_size = self.max_parallel_tasks or len(ready)
+            if chunk_size <= 0:
+                chunk_size = len(ready)
 
-            self._emit(
-                "TASK_GRAPH_BATCH_STARTED",
-                {
-                    "plan_id": plan.plan_id,
-                    "batch_index": batch_count,
-                    "task_ids": [task.task_id for task in ready],
-                },
-            )
-
-            async def _run_with_timeout(ds_task: WorkerTask, ds_context: dict[str, Any]) -> WorkerTask:
-                try:
-                    return await asyncio.wait_for(
-                        self.worker_dispatcher(ds_task, ds_context),
-                        timeout=self.task_timeout_seconds,
-                    )
-                except asyncio.TimeoutError:
-                    ds_task.status = TaskStatus.FAILED
-                    ds_task.error_log = (
-                        f"Task exceeded {self.task_timeout_seconds}s timeout boundary."
-                    )
-                    ds_task.attempt_count += 1
-                    return ds_task
-
-            results = await asyncio.gather(
-                *[
-                    _run_with_timeout(
-                        task,
-                        {
-                            "global": dict(global_context),
-                            "dependency_results": {
-                                dependency: completed[dependency].result
-                                for dependency in task.dependencies
-                            },
-                        },
-                    )
-                    for task in ready
-                ],
-                return_exceptions=True,
-            )
-
-            for task, result in zip(ready, results):
-                if isinstance(result, BaseException):
-                    task_failure_count += 1
-                    raise TaskGraphExecutionError(
-                        f"Task '{task.task_id}' raised an unhandled exception: {result}",
-                        started_execution=started_execution,
-                    ) from result
-
-                worker_result: WorkerTask = result
-                retry_count += max(worker_result.attempt_count - 1, 0)
-                completed[worker_result.task_id] = worker_result
-                if worker_result.result is not None:
-                    global_context[f"task_{worker_result.task_id}_result"] = worker_result.result
+            for index in range(0, len(ready), chunk_size):
+                ready_chunk = ready[index : index + chunk_size]
+                batch_count += 1
+                started_execution = True
+                for task in ready_chunk:
+                    pending.pop(task.task_id, None)
+                    task.status = TaskStatus.IN_PROGRESS
 
                 self._emit(
-                    "TASK_EXECUTION_RESULT",
+                    "TASK_GRAPH_BATCH_STARTED",
                     {
                         "plan_id": plan.plan_id,
-                        "task_id": worker_result.task_id,
-                        "status": worker_result.status.value,
-                        "attempt_count": worker_result.attempt_count,
-                        "error_log": worker_result.error_log,
+                        "batch_index": batch_count,
+                        "task_ids": [task.task_id for task in ready_chunk],
                     },
                 )
 
-                if worker_result.status != TaskStatus.COMPLETED:
-                    task_failure_count += 1
-                    raise TaskGraphExecutionError(
-                        f"Task '{worker_result.task_id}' failed after {worker_result.attempt_count} attempt(s).",
-                        started_execution=started_execution,
+                async def _run_with_timeout(ds_task: WorkerTask, ds_context: dict[str, Any]) -> WorkerTask:
+                    try:
+                        return await asyncio.wait_for(
+                            self.worker_dispatcher(ds_task, ds_context),
+                            timeout=self.task_timeout_seconds,
+                        )
+                    except asyncio.TimeoutError:
+                        ds_task.status = TaskStatus.FAILED
+                        ds_task.error_log = (
+                            f"Task exceeded {self.task_timeout_seconds}s timeout boundary."
+                        )
+                        ds_task.attempt_count += 1
+                        return ds_task
+
+                results = await asyncio.gather(
+                    *[
+                        _run_with_timeout(
+                            task,
+                            {
+                                "global": dict(global_context),
+                                "dependency_results": {
+                                    dependency: completed[dependency].result
+                                    for dependency in task.dependencies
+                                },
+                            },
+                        )
+                        for task in ready_chunk
+                    ],
+                    return_exceptions=True,
+                )
+
+                for task, result in zip(ready_chunk, results):
+                    if isinstance(result, BaseException):
+                        task_failure_count += 1
+                        raise TaskGraphExecutionError(
+                            f"Task '{task.task_id}' raised an unhandled exception: {result}",
+                            started_execution=started_execution,
+                        ) from result
+
+                    worker_result: WorkerTask = result
+                    retry_count += max(worker_result.attempt_count - 1, 0)
+                    completed[worker_result.task_id] = worker_result
+                    if worker_result.result is not None:
+                        global_context[f"task_{worker_result.task_id}_result"] = worker_result.result
+
+                    self._emit(
+                        "TASK_EXECUTION_RESULT",
+                        {
+                            "plan_id": plan.plan_id,
+                            "task_id": worker_result.task_id,
+                            "status": worker_result.status.value,
+                            "attempt_count": worker_result.attempt_count,
+                            "error_log": worker_result.error_log,
+                        },
                     )
 
-            self._emit(
-                "TASK_GRAPH_BATCH_COMPLETED",
-                {
-                    "plan_id": plan.plan_id,
-                    "batch_index": batch_count,
-                    "task_ids": [task.task_id for task in ready],
-                    "completed_task_count": len(completed),
-                },
-            )
+                    if worker_result.status != TaskStatus.COMPLETED:
+                        task_failure_count += 1
+                        raise TaskGraphExecutionError(
+                            f"Task '{worker_result.task_id}' failed after {worker_result.attempt_count} attempt(s).",
+                            started_execution=started_execution,
+                        )
+
+                self._emit(
+                    "TASK_GRAPH_BATCH_COMPLETED",
+                    {
+                        "plan_id": plan.plan_id,
+                        "batch_index": batch_count,
+                        "task_ids": [task.task_id for task in ready_chunk],
+                        "completed_task_count": len(completed),
+                    },
+                )
 
         return TaskGraphExecutionSummary(
             plan_id=plan.plan_id,

@@ -29,9 +29,10 @@ class RedactionFilter(logging.Filter):
             rendered = record.getMessage()
             record.msg = redact_sensitive_text(str(rendered))
             record.args = ()
-        except Exception:
-            # Never block logging if redaction fails.
-            pass
+        except Exception as exc:
+            raise RuntimeError(
+                f"Log redaction failed for record '{record.name}': {exc}"
+            ) from exc
         return True
 
 

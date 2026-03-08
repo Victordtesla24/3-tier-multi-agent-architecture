@@ -37,18 +37,23 @@ CrewAI’s concepts map into the 3‑tier system with minimal impedance mismatch
 
 The **Orchestration Tier (Manager/Router)** corresponds to CrewAI’s **manager** role in hierarchical execution. CrewAI’s documentation describes a hierarchical process where a manager agent/model oversees task execution, including planning, delegation, and validation, and requires specifying a `manager_llm` or `manager_agent`. In this integration, the manager’s LLM is bound to the Orchestration Tier model pair:
 
-- Primary: **Google/Gemini‑3.1‑Pro‑Preview** (High thinking)
-- Fallback: **OpenAI/GPT‑5.2‑Codex** (xHigh reasoning)
+- Primary: **OpenAI/GPT‑5.4** (requested xHigh thinking preserved in metadata and normalized to runtime high)
+- Fallback: **OpenAI/GPT‑5.3‑Codex** (requested xHigh thinking preserved in metadata and normalized to runtime high)
 
 The **Level 1 Tier (Senior/Analytical Agents)** maps to CrewAI Agents configured for planning, orchestration decomposition, and analysis. CrewAI Agents can be explicitly assigned an LLM (overriding Crew defaults), can use reasoning/planning features, and can delegate when allowed. This tier is bound to:
 
-- Primary: **OpenAI/GPT‑5.2‑Codex** (Medium reasoning)
-- Fallback: **MiniMax/Minimax‑m2.5** via OpenAI‑compatible proxy (Medium reasoning)
+- Primary: **Google/Gemini‑3‑Pro‑Preview** (High thinking, `temperature=0.15`)
+- Fallback: **Ollama/Qwen 3 14B** via local runtime (Medium reasoning intent, `temperature=0.15`)
 
-The **Level 2 Tier (Execution/Worker Agents)** maps to CrewAI Agents specialised for implementation and high‑throughput work. This tier is bound to:
+The **Level 2 Tier (Coordinator / QA Agents)** maps to CrewAI Agents specialised for coordination, validation, and retry gating. This tier is bound to:
 
-- Primary: **MiniMax/Minimax‑m2.5** via OpenAI‑compatible proxy (Low reasoning)
-- Fallback: **deepseek/deepseek‑v3.2** via OpenAI‑compatible proxy (Low reasoning)
+- Primary: **Ollama/Qwen 3 8B** via local runtime (`temperature=0.15`)
+- Fallback: **Ollama/Qwen 3 14B** via local runtime (`temperature=0.15`)
+
+The **Level 3 Tier (Execution / Leaf Workers)** maps to CrewAI Agents responsible for atomic task execution. By default it mirrors the Level 2 primary provider family while remaining independently configurable through `.env`:
+
+- Primary: **Ollama/Qwen 2.5 Coder 7B** via local runtime (`temperature=0.15`)
+- Fallback: **Ollama/Qwen 2.5 Coder 14B** via local runtime (`temperature=0.15`)
 
 CrewAI’s built‑in memory system is enabled at the Crew level via `memory=True`, and storage location can be controlled via the `CREWAI_STORAGE_DIR` environment variable. This integration routes CrewAI memory storage into the existing `.agent/memory/` hierarchy to remain consistent with the 3‑tier architecture’s persistence model.
 
@@ -56,32 +61,34 @@ CrewAI’s built‑in memory system is enabled at the Crew level via `memory=Tru
 
 ### OpenAI reasoning effort enforcement
 
-OpenAI’s `reasoning_effort` parameter supports `xhigh`, and GPT‑5.2‑Codex explicitly supports `low`, `medium`, `high`, and `xhigh` reasoning effort settings. This integration passes the tier‑mapped effort as the reasoning control:
+OpenAI’s GPT‑5 family exposes reasoning controls, but the installed CrewAI/LiteLLM surface currently accepts `low`, `medium`, and `high`. This integration therefore preserves requested `thinking=xHigh` in metadata and normalizes runtime reasoning to `high`:
 
-- Orchestration fallback GPT‑5.2‑Codex: `reasoning_effort="xhigh"`
-- L1 GPT‑5.2‑Codex: `reasoning_effort="medium"`
-- L1 MiniMax: `reasoning_effort="medium"` (passed through the OpenAI‑compatible proxy)
-- L2 MiniMax + DeepSeek: `reasoning_effort="low"` (passed through each OpenAI‑compatible proxy)
+- Orchestration primary GPT‑5.4: `reasoning_effort="high"`
+- Orchestration fallback GPT‑5.3‑Codex: `reasoning_effort="high"`
+- Local Ollama tiers do not receive a provider-specific `reasoning_effort` parameter; model/runtime defaults handle reasoning behaviour while `temperature=0.15` remains applied.
+
+GPT‑5 family models also reject `temperature`, so requested `temperature=0.15` is omitted at runtime for GPT‑5 selections.
 
 ### Gemini thinking effort enforcement
 
-Google documents that Gemini 3 models default to dynamic high thinking if `thinkingLevel` is not specified. CrewAI’s Gemini integration is implemented via the Google GenAI SDK and supports standard Gemini model invocation with `GOOGLE_API_KEY` or `GEMINI_API_KEY`. Because CrewAI’s public LLM documentation does not explicitly document a pass‑through parameter for `thinkingLevel`, this implementation treats the configured Gemini manager as **High thinking** by selecting the Gemini 3.1 Pro Preview class model and relying on Google’s documented default dynamic `"high"` thinking behaviour for Gemini 3 when `thinkingLevel` is omitted.
+Google documents that Gemini 3 models default to dynamic high thinking if `thinkingLevel` is not specified. CrewAI’s Gemini integration is implemented via the Google GenAI SDK and supports standard Gemini model invocation with `GOOGLE_API_KEY` or `GEMINI_API_KEY`. Because CrewAI’s public LLM documentation does not explicitly document a pass‑through parameter for `thinkingLevel`, this implementation treats the configured analytical tier as **High thinking** by selecting the Gemini 3 Pro Preview model and relying on Google’s documented default dynamic `"high"` thinking behaviour for Gemini 3 when `thinkingLevel` is omitted. `temperature=0.15` is applied directly.
 
-### Proxy routing for MiniMax and DeepSeek
+### Local runtime routing for Ollama
 
-CrewAI’s OpenAI integration exposes `base_url` as an officially documented configuration parameter. This integration therefore routes non‑native vendors through OpenAI‑compatible proxies by setting:
+CrewAI’s LiteLLM integration supports Ollama models via a local `base_url`. This integration routes keyless open-source tiers through:
 
-- MiniMax requests: `base_url=$MINIMAX_BASE_URL` (from `.env`)
-- DeepSeek requests: `base_url=$DEEPSEEK_BASE_URL` (from `.env`)
+- Ollama requests: `base_url=$OLLAMA_BASE_URL` (default `http://127.0.0.1:11434`)
 
-Your brief states only Google and OpenAI keys exist natively; therefore this integration uses `OPENAI_API_KEY` as the authentication key when calling the OpenAI‑compatible proxy endpoints unless your proxy requires a different header/credential scheme (in which case the proxy itself must be configured to accept the OpenAI key or you must add a proxy‑specific key to `.env`). CrewAI allows custom `base_url` and supports different provider configurations through LLM instantiation.
+The runtime now treats tier-specific env vars as authoritative: `ORCHESTRATION_MODEL`, `L1_MODEL`, `L2_MODEL`, and `L3_MODEL` override `PRIMARY_LLM`, while `L2_AGENT_SWARMS` and `L3_AGENT_SWARMS` control task-graph evaluation and execution concurrency. Legacy alias env names such as `GEMINI_API_KEY` remain accepted and are normalized in memory without rewriting the user’s `.env`.
+
+The validation flow is intentionally split into two layers. `scripts/validate_runtime_env.py --live` proves the active primary tier selections can answer a minimal prompt through CrewAI/LiteLLM, while `--probe-configured-providers` separately probes every configured provider credential in `.env` with official REST calls so inactive or dead credentials are surfaced explicitly instead of being hidden by a healthy active matrix.
 
 
 ## Production configuration code implementing the model matrix and CrewAI merge
 
 ### llm_config.py
 
-The integration hardcodes your tiered model matrix and configures OpenAI reasoning effort and OpenAI‑compatible proxy base URLs via environment variables. CrewAI’s LLM documentation explicitly supports OpenAI `base_url` override and Gemini API key configuration. OpenAI’s reasoning effort surface includes `xhigh`, and GPT‑5.2‑Codex supports these effort levels.
+The integration hardcodes the tiered model matrix and configures normalized OpenAI reasoning effort together with OpenAI‑compatible proxy base URLs via environment variables. CrewAI’s LLM documentation explicitly supports OpenAI `base_url` override and Gemini API key configuration.
 
 > **Source:** See [`src/engine/llm_config.py`](../../../src/engine/llm_config.py) for the production implementation.
 
@@ -102,4 +109,4 @@ The final workspace is intentionally reduced to the **single source of truth**: 
 
 CrewAI’s memory system persists under `.agent/memory/crewai_storage` and is enabled using `memory=True`, consistent with CrewAI documentation describing built‑in memory and storage configuration via `CREWAI_STORAGE_DIR`.
 
-To ensure your **thinking/reasoning policy** is maintained across model providers, this integration uses strict runtime configuration surfaces that are officially documented: OpenAI’s `reasoning_effort` supports `xhigh` and is passed explicitly for GPT‑5.2‑Codex routing, and Gemini 3’s high thinking behaviour is satisfied by selecting a Gemini 3.x model and relying on Google’s documented default `"high"` thinking level when `thinkingLevel` is not specified.
+To ensure your **thinking/reasoning policy** is maintained across model providers, this integration uses strict runtime configuration surfaces that are officially documented: GPT‑5 requests preserve requested `thinking=xHigh` but normalize runtime `reasoning_effort` to `high`, GPT‑5 temperatures are omitted because the API rejects them, and Gemini 3’s high thinking behaviour is satisfied by selecting a Gemini 3.x model and relying on Google’s documented default `"high"` thinking level when `thinkingLevel` is not specified.

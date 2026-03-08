@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import threading
+import time
 from unittest.mock import patch
 
 import pytest
@@ -26,10 +28,7 @@ def mock_env():
         {
             "GOOGLE_API_KEY": "dummy_google_key",
             "OPENAI_API_KEY": "dummy_openai_key",
-            "MINIMAX_API_KEY": "dummy_minimax_key",
-            "DEEPSEEK_API_KEY": "dummy_deepseek_key",
-            "MINIMAX_BASE_URL": "https://dummy.minimax.api",
-            "DEEPSEEK_BASE_URL": "https://dummy.deepseek.api",
+            "OLLAMA_BASE_URL": "http://127.0.0.1:11434",
         },
     ):
         yield
@@ -147,6 +146,38 @@ def test_dag_executor_runs_parallel_batches():
     assert batch_events[1]["task_ids"] == ["task_c"]
 
 
+def test_dag_executor_caps_parallel_batches():
+    plan = OrchestrationPlan(
+        original_query="parallel-capped",
+        tasks=[
+            WorkerTask(task_id="task_a", description="A"),
+            WorkerTask(task_id="task_b", description="B"),
+            WorkerTask(task_id="task_c", description="C"),
+            WorkerTask(task_id="task_d", description="D"),
+            WorkerTask(task_id="task_e", description="E"),
+        ],
+    )
+    events: list[tuple[str, dict[str, object]]] = []
+
+    async def dispatcher(task: WorkerTask, _context: dict[str, object]) -> WorkerTask:
+        await asyncio.sleep(0.01)
+        task.status = TaskStatus.COMPLETED
+        task.result = f"result::{task.task_id}"
+        task.attempt_count = 1
+        return task
+
+    summary = DAGTaskExecutor(
+        worker_dispatcher=dispatcher,
+        event_sink=lambda event_type, details: events.append((event_type, details)),
+        max_parallel_tasks=3,
+    ).execute_plan_sync(plan)
+
+    assert summary.parallel_batch_count == 2
+    batch_events = [details for event, details in events if event == "TASK_GRAPH_BATCH_STARTED"]
+    assert batch_events[0]["task_ids"] == ["task_a", "task_b", "task_c"]
+    assert batch_events[1]["task_ids"] == ["task_d", "task_e"]
+
+
 def test_dag_executor_enforces_timeout():
     """Verify that a hanging worker task is bounded by task_timeout_seconds and yields TaskStatus.FAILED."""
     plan = OrchestrationPlan(
@@ -240,7 +271,46 @@ def test_reflexive_worker_marks_failure_after_retry_exhaustion():
     assert "failed QA" in str(result.error_log)
 
 
+def test_level2_evaluation_semaphore_limits_concurrency():
+    orchestrator = CrewAIThreeTierOrchestrator.__new__(CrewAIThreeTierOrchestrator)
+    orchestrator._level2_evaluator_semaphore = asyncio.Semaphore(2)
+
+    lock = threading.Lock()
+    active = 0
+    max_active = 0
+
+    def fake_eval(*, task: WorkerTask, candidate_output: str, task_context: dict[str, object]) -> str:
+        nonlocal active, max_active
+        with lock:
+            active += 1
+            max_active = max(max_active, active)
+        time.sleep(0.03)
+        with lock:
+            active -= 1
+        return f"PASS::{task.task_id}::{candidate_output}::{task_context!r}"
+
+    orchestrator._evaluate_task_graph_worker_output = fake_eval
+
+    async def run() -> list[str]:
+        return await asyncio.gather(
+            *[
+                orchestrator._evaluate_task_graph_worker_output_bounded(
+                    task=WorkerTask(task_id=f"task_{index}", description=f"Task {index}"),
+                    candidate_output="candidate",
+                    task_context={},
+                )
+                for index in range(5)
+            ]
+        )
+
+    results = asyncio.run(run())
+
+    assert len(results) == 5
+    assert max_active == 2
+
+
 def test_execute_prefers_task_graph_path_and_writes_final_output(tmp_path, monkeypatch):
+    monkeypatch.setattr("engine.crew_orchestrator._MODULE_PROJECT_ROOT", tmp_path)
     orchestrator = CrewAIThreeTierOrchestrator(workspace_dir=str(tmp_path), verbose=False)
     plan = OrchestrationPlan(
         plan_id="plan-123",
@@ -284,6 +354,7 @@ def test_execute_prefers_task_graph_path_and_writes_final_output(tmp_path, monke
 
 def test_execute_falls_back_to_legacy_when_planning_fails(tmp_path, monkeypatch):
     events: list[tuple[str, dict[str, object]]] = []
+    monkeypatch.setattr("engine.crew_orchestrator._MODULE_PROJECT_ROOT", tmp_path)
     orchestrator = CrewAIThreeTierOrchestrator(
         workspace_dir=str(tmp_path),
         verbose=False,

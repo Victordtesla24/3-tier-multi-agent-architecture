@@ -1,22 +1,22 @@
 # Antigravity Execution Benchmark Results
 
-**Run:** `2026-03-04T16:26:41.454155+00:00`
+**Run:** `2026-03-08T05:19:48.980504+00:00`
 
 | Metric | Value |
 |:-------|:------|
 | Total Fixtures | 3 |
 | Passed | 3 |
 | Failed | 0 |
-| Total Latency | 0.0027s |
-| Avg Latency | 0.0009s |
+| Total Latency | 0.0067s |
+| Avg Latency | 0.0022s |
 
 ## Individual Results
 
 | Fixture | Category | Status | Latency |
 |:--------|:---------|:-------|:--------|
-| fibonacci_sequence | algorithmic | ✅ PASS | 0.0013s |
-| input_data_extraction | code_generation | ✅ PASS | 0.0008s |
-| system_initialization | smoke_test | ✅ PASS | 0.0006s |
+| fibonacci_sequence | algorithmic | ✅ PASS | 0.0026s |
+| input_data_extraction | code_generation | ✅ PASS | 0.0022s |
+| system_initialization | smoke_test | ✅ PASS | 0.0019s |
 
 ---
 

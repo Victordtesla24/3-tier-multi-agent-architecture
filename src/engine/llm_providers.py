@@ -1,98 +1,60 @@
-"""Multi-Provider LLM Configuration with Fallback Support
+"""Legacy multi-provider LLM helpers used by older integration paths."""
 
-Provider routing uses the canonical model strings for CrewAI/LiteLLM:
-  - Gemini models: gemini/<model-id>
-  - OpenAI models: openai/<model-id>  (or just the model ID for direct OpenAI)
-  - OpenAI-compatible proxies (MiniMax, DeepSeek): openai/<model-id> with custom base_url
+from __future__ import annotations
 
-ThinkingEffort maps reasoning tier to temperature — lower temperature = more focused.
-"""
 import os
+from pathlib import Path
 
 from crewai import LLM
-from dotenv import load_dotenv
 
-load_dotenv()
+from engine.llm_config import build_llm, resolved_model_specs
+from engine.runtime_env import resolve_runtime_env
+
+_MODULE_PROJECT_ROOT = Path(__file__).parent.parent.parent.resolve()
 
 
 class ThinkingEffort:
-    """Thinking effort levels mapped to temperature."""
+    """Legacy temperature hints retained for backwards-compatible imports."""
+
     LOW = 0.9
     MEDIUM = 0.5
     HIGH = 0.25
     XHIGH = 0.1
 
 
-class LLMProvider:
-    """Central LLM provider configuration — single LLM instances without FallbackLLM wrapper.
+def _default_workspace() -> Path:
+    candidate = os.environ.get("ANTIGRAVITY_WORKSPACE_DIR", "").strip()
+    if candidate:
+        return Path(candidate).resolve()
+    return Path.cwd().resolve()
 
-    Used by crew_agents.py for direct agent LLM assignment.
-    For tiered primary/fallback model selection, use llm_config.build_model_matrix().
-    """
+
+def _resolved_specs() -> tuple:
+    workspace = _default_workspace()
+    return resolved_model_specs(
+        resolve_runtime_env(workspace, project_root=_MODULE_PROJECT_ROOT)
+    )
+
+
+class LLMProvider:
+    """Central LLM provider configuration for env-driven tier selection."""
 
     @staticmethod
     def get_orchestration_llm(fallback: bool = False) -> LLM:
-        """Get Orchestration Tier LLM with High/XHigh thinking effort."""
-        if not fallback:
-            # Primary: Google Gemini 3.1 Pro Preview
-            return LLM(
-                model="gemini/gemini-3.1-pro-preview",
-                api_key=os.getenv("GOOGLE_API_KEY"),
-                temperature=ThinkingEffort.HIGH,
-                max_tokens=8192,
-            )
-        else:
-            # Fallback: OpenAI GPT-5.2-Codex with XHigh thinking
-            return LLM(
-                model="openai/gpt-5.2-codex",
-                api_key=os.getenv("OPENAI_API_KEY"),
-                temperature=ThinkingEffort.XHIGH,
-                max_tokens=16384,
-            )
+        specs = _resolved_specs()
+        return build_llm(specs[1] if fallback else specs[0])
 
     @staticmethod
     def get_l1_llm(fallback: bool = False) -> LLM:
-        """Get L1 Agent LLM with Medium thinking effort."""
-        if not fallback:
-            # Primary: OpenAI GPT-5.2-Codex
-            return LLM(
-                model="openai/gpt-5.2-codex",
-                api_key=os.getenv("OPENAI_API_KEY"),
-                temperature=ThinkingEffort.MEDIUM,
-                max_tokens=8192,
-            )
-        else:
-            # Fallback: MiniMax m2.5 via OpenAI-compatible proxy
-            # Must use openai/ prefix + base_url for OpenAI-compatible endpoints
-            base_url = os.getenv("MINIMAX_BASE_URL", "https://api.minimax.chat/v1")
-            return LLM(
-                model="openai/minimax-m2.5",
-                api_key=os.getenv("MINIMAX_API_KEY"),
-                base_url=base_url.rstrip("/"),
-                temperature=ThinkingEffort.MEDIUM,
-                max_tokens=8192,
-            )
+        specs = _resolved_specs()
+        return build_llm(specs[3] if fallback else specs[2])
 
     @staticmethod
     def get_l2_llm(fallback: bool = False) -> LLM:
-        """Get L2 Agent LLM with Low thinking effort."""
-        if not fallback:
-            # Primary: MiniMax m2.5 via OpenAI-compatible proxy
-            base_url = os.getenv("MINIMAX_BASE_URL", "https://api.minimax.chat/v1")
-            return LLM(
-                model="openai/minimax-m2.5",
-                api_key=os.getenv("MINIMAX_API_KEY"),
-                base_url=base_url.rstrip("/"),
-                temperature=ThinkingEffort.LOW,
-                max_tokens=4096,
-            )
-        else:
-            # Fallback: DeepSeek v3.2 via OpenAI-compatible proxy
-            base_url = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1")
-            return LLM(
-                model="openai/deepseek-v3.2",
-                api_key=os.getenv("DEEPSEEK_API_KEY"),
-                base_url=base_url.rstrip("/"),
-                temperature=ThinkingEffort.LOW,
-                max_tokens=4096,
-            )
+        specs = _resolved_specs()
+        return build_llm(specs[5] if fallback else specs[4])
+
+    @staticmethod
+    def get_l3_llm(fallback: bool = False) -> LLM:
+        specs = _resolved_specs()
+        return build_llm(specs[7] if fallback else specs[6])

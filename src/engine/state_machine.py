@@ -6,6 +6,7 @@ import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from threading import Lock
 from typing import Dict, Any, Tuple
 
 from engine.context_builder import build_orchestration_context_block
@@ -86,6 +87,9 @@ class OrchestrationStateMachine:
         self.parallel_batch_count = 0
         self.worker_retry_count = 0
         self.task_failure_count = 0
+        self.runtime_tier_matrix: Dict[str, str] = {}
+        self.runtime_config_warnings: list[str] = []
+        self._log_lock = Lock()
         self._reset_execution_tracking()
 
         # Ensure observability path exists
@@ -107,6 +111,8 @@ class OrchestrationStateMachine:
         self.parallel_batch_count = 0
         self.worker_retry_count = 0
         self.task_failure_count = 0
+        self.runtime_tier_matrix = {}
+        self.runtime_config_warnings = []
         self.stage_progress = {
             stage: {
                 "status": "pending",
@@ -182,25 +188,31 @@ class OrchestrationStateMachine:
             "parallel_batch_count": self.parallel_batch_count,
             "worker_retry_count": self.worker_retry_count,
             "task_failure_count": self.task_failure_count,
+            "runtime_tier_matrix": dict(self.runtime_tier_matrix),
+            "runtime_config_warnings": list(self.runtime_config_warnings),
         }
 
     def _structured_log(self, event_type: str, details: dict):
         """Appends structured JSON telemetry to the central memory file."""
         try:
-            with open(self.log_path, "r+") as f:
-                data = json.load(f)
-                data["executions"].append(
-                    {
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                        "run_id": self.run_id,
-                        "state": self.state,
-                        "event": event_type,
-                        "details": details,
-                    }
-                )
-                f.seek(0)
-                json.dump(data, f, indent=2)
-                f.truncate()
+            with self._log_lock:
+                with open(self.log_path, "r+", encoding="utf-8") as f:
+                    try:
+                        data = json.load(f)
+                    except json.JSONDecodeError:
+                        data = {"executions": []}
+                    data["executions"].append(
+                        {
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                            "run_id": self.run_id,
+                            "state": self.state,
+                            "event": event_type,
+                            "details": details,
+                        }
+                    )
+                    f.seek(0)
+                    json.dump(data, f, indent=2)
+                    f.truncate()
         except Exception as e:
             logger.error(f"Failed to write structured log: {e}")
 
@@ -264,6 +276,11 @@ class OrchestrationStateMachine:
             self.execution_mode = str(details.get("execution_mode", "task_graph"))
             self.plan_id = str(details.get("plan_id")) if details.get("plan_id") else None
             self.task_count = int(details.get("task_count", 0))
+        elif event_type == "RUNTIME_ENV_RESOLVED":
+            self.runtime_tier_matrix = dict(details.get("tier_primary_logical_ids", {}))
+            self.runtime_config_warnings = [
+                str(item) for item in details.get("warnings", []) if item
+            ]
         elif event_type == "TASK_GRAPH_BATCH_COMPLETED":
             self.parallel_batch_count = max(
                 self.parallel_batch_count,

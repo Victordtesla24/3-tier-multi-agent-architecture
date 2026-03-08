@@ -1,6 +1,7 @@
 import pytest
 import sys
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
@@ -23,10 +24,7 @@ def mock_env_vars():
     with patch.dict("os.environ", {
         "GOOGLE_API_KEY": "dummy_gemini_key",
         "OPENAI_API_KEY": "dummy_openai_key",
-        "MINIMAX_API_KEY": "dummy_minimax_key",
-        "DEEPSEEK_API_KEY": "dummy_deepseek_key",
-        "MINIMAX_BASE_URL": "https://dummy.minimax.api",
-        "DEEPSEEK_BASE_URL": "https://dummy.deepseek.api",
+        "OLLAMA_BASE_URL": "http://127.0.0.1:11434",
     }):
         yield
 
@@ -219,3 +217,19 @@ def test_provider_4xx_budget_enforced(mock_workspace):
 
     with pytest.raises(PipelineError):
         machine._enforce_provider_error_budget("unit_test_budget")
+
+
+def test_structured_log_remains_valid_under_concurrent_writes(mock_workspace):
+    from engine.state_machine import OrchestrationStateMachine
+
+    machine = OrchestrationStateMachine(workspace_dir=mock_workspace)
+
+    def _write_event(index: int) -> None:
+        machine._structured_log("CONCURRENT_TEST", {"index": index})
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(_write_event, range(20)))
+
+    data = json.loads((Path(mock_workspace) / ".agent" / "memory" / "execution_log.json").read_text())
+    assert len(data["executions"]) == 20
+    assert {item["details"]["index"] for item in data["executions"]} == set(range(20))

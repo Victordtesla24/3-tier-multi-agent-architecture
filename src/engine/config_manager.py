@@ -6,11 +6,16 @@ from pathlib import Path
 try:
     from ruamel.yaml import YAML
 except ImportError:
-    print("CRITICAL: ruamel.yaml not installed. Please run `uv sync`")
-    sys.exit(1)
+    YAML = None
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("ConfigManager")
+
+
+def _dump_simple_mapping(target_file: Path, data: dict) -> None:
+    """Fallback writer used when ruamel.yaml is unavailable."""
+    lines = [f"{key}: {value}" for key, value in data.items()]
+    target_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 def merge_config_safely(config_path: str, new_settings: dict) -> None:
     """
@@ -28,40 +33,59 @@ def merge_config_safely(config_path: str, new_settings: dict) -> None:
     shutil.copy2(target_file, backup_path)
     logger.info(f"Atomic backup created at {backup_path}")
 
-    yaml = YAML()
-    yaml.preserve_quotes = True
-
     try:
-        with open(target_file, 'r') as f:
-            data = yaml.load(f)
-            if data is None:
+        if YAML is None:
+            logger.warning(
+                "ruamel.yaml is unavailable; falling back to simple key/value config writing."
+            )
+            data = {}
+        else:
+            yaml = YAML()
+            yaml.preserve_quotes = True
+
+            with open(target_file, 'r') as f:
+                raw = f.read()
+            try:
+                import io
+                data = yaml.load(io.StringIO(raw))
+            except Exception:
+                # File is not valid YAML (e.g., it is a Markdown document).
+                # Treat existing content as opaque and seed an empty mapping.
+                data = None
+            if not isinstance(data, dict):
                 data = {}
-                
+
         # Merge structurally
         for key, value in new_settings.items():
             data[key] = value
-            
-        with open(target_file, 'w') as f:
-            yaml.dump(data, f)
-            
+
+        if YAML is None:
+            _dump_simple_mapping(target_file, data)
+        else:
+            with open(target_file, 'w') as f:
+                yaml.dump(data, f)
+
         logger.info(f"Configuration merged and safely injected into {config_path}")
 
     except Exception as e:
-        logger.error(f"FATAL parsing error in {config_path}. Restoring from backup. Exception: {e}")
+        logger.error(
+            f"FATAL error writing {config_path}. Restoring from backup. Exception: {e}"
+        )
         shutil.copy2(backup_path, target_file)
         sys.exit(1)
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        logger.error("Usage: python config_manager.py <path_to_gemini_md>")
+        logger.error("Usage: python config_manager.py <path_to_gemini_md> [default_model_label]")
         sys.exit(1)
         
     gemini_conf = sys.argv[1]
+    default_model = sys.argv[2] if len(sys.argv) >= 3 else "OpenAI GPT-5.4 (Latest Flagship)"
     
     settingsToInject = {
         "orchestration_entry": ".agent/workflows/3-tier-orchestration.md",
-        "default_model": "Gemini 3.1 Pro Preview",
+        "default_model": default_model,
         "startup_hook": ".agent/rules/system-verification-agent.md",
         "new_chat_hook": ".agent/rules/system-verification-agent.md"
     }
