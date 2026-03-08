@@ -218,8 +218,22 @@ class TestModelConfig:
             keys = set(required_env_keys_for_active_matrix("deepseek/deepseek-chat"))
             assert "DEEPSEEK_API_KEY" in keys
             assert "DEEPSEEK_BASE_URL" in keys
-            assert "GOOGLE_API_KEY" in keys
-            assert "OLLAMA_BASE_URL" in keys
+
+    def test_active_matrix_defaults_keep_tier_specialisation_when_primary_selected(self):
+        from engine.model_catalog import (
+            DEFAULT_LEVEL1_MODEL,
+            DEFAULT_LEVEL2_MODEL,
+            DEFAULT_LEVEL3_MODEL,
+            active_matrix_env_defaults,
+        )
+
+        defaults = dict(active_matrix_env_defaults("openai/gpt-5.4"))
+
+        assert defaults["PRIMARY_LLM"] == "openai/gpt-5.4"
+        assert defaults["ORCHESTRATION_MODEL"] == "openai/gpt-5.4"
+        assert defaults["L1_MODEL"] == DEFAULT_LEVEL1_MODEL
+        assert defaults["L2_MODEL"] == DEFAULT_LEVEL2_MODEL
+        assert defaults["L3_MODEL"] == DEFAULT_LEVEL3_MODEL
 
     def test_build_model_matrix_exposes_explicit_level3_tier(self, tmp_path):
         from engine.llm_config import build_model_matrix

@@ -80,3 +80,59 @@ def test_log_redaction_masks_api_keys():
     redacted = redact_sensitive_text(sample)
     assert "TEST_EXAMPLE_KEY_123" not in redacted
     assert "key=[REDACTED]" in redacted
+
+
+def test_cli_defaults_workspace_to_project_root(monkeypatch, capsys):
+    module = _load_cli_module()
+    captured = {}
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "antigravity-cli.py",
+            "--prompt",
+            "smoke test",
+        ],
+    )
+    monkeypatch.delenv("ANTIGRAVITY_WORKSPACE_DIR", raising=False)
+    monkeypatch.delenv("ANTIGRAVITY_WORKSPACE_ROOT", raising=False)
+
+    monkeypatch.setattr(module.ArchitectureHealer, "validate_and_heal", lambda *args, **kwargs: True)
+    def _fake_run_orchestration(cfg):
+        captured["workspace"] = cfg.workspace
+        return SimpleNamespace(
+            success=True,
+            workspace=cfg.workspace,
+            prompt=cfg.prompt,
+            strict_provider_validation=cfg.strict_provider_validation,
+            max_provider_4xx=cfg.max_provider_4xx,
+            fail_on_research_empty=cfg.fail_on_research_empty,
+            run_id="test-run-id",
+            execution_log_path=cfg.workspace / ".agent" / "memory" / "execution_log.json",
+            final_output_path=cfg.workspace / ".agent" / "tmp" / "final_output.md",
+            reconstructed_prompt_path=cfg.workspace / ".agent" / "tmp" / "reconstructed_prompt.md",
+            research_context_path=cfg.workspace / ".agent" / "tmp" / "research-context.md",
+            provider_4xx_count=0,
+            completion_status="success",
+            completion_summary="ok",
+            failed_stage=None,
+            execution_mode="task_graph",
+            plan_id="plan-123",
+            task_count=2,
+            parallel_batch_count=1,
+            worker_retry_count=0,
+            task_failure_count=0,
+            stage_progress={},
+            error=None,
+        )
+    monkeypatch.setattr(
+        "engine.orchestration_api.run_orchestration",
+        _fake_run_orchestration,
+    )
+
+    exit_code = module.main()
+    _ = capsys.readouterr()
+
+    assert exit_code == 0
+    assert captured["workspace"] == module.PROJECT_ROOT

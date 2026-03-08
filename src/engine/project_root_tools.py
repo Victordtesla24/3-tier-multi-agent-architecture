@@ -11,7 +11,11 @@ _ALLOWED_PREFIXES = (
     ".agent/rules/",
     ".agent/workflows/",
     "docs/architecture/",
+    "docs/reports/",
+    "docs/benchmarks/",
 )
+# Project-root tools stay scoped to curated governance docs. Full repository
+# edit parity is provided through workspace tools when workspace_root=repo root.
 
 
 class ProjectFileReadArgs(BaseModel):
@@ -48,7 +52,8 @@ class ProjectRootFileReadTool(BaseTool):
     name: str = "project_root_file_read"
     description: str = (
         "Read a UTF-8 text file from project root, restricted to "
-        ".agent/rules/*, .agent/workflows/*, and docs/architecture/*."
+        ".agent/rules/*, .agent/workflows/*, docs/architecture/*, "
+        "docs/reports/*, and docs/benchmarks/*."
     )
     args_schema: Type[BaseModel] = ProjectFileReadArgs
     project_root: str = Field(..., description="Absolute project root path.")
@@ -65,7 +70,8 @@ class ProjectRootFileWriteTool(BaseTool):
     name: str = "project_root_file_write"
     description: str = (
         "Write UTF-8 text under project root, restricted to "
-        ".agent/rules/*, .agent/workflows/*, and docs/architecture/*."
+        ".agent/rules/*, .agent/workflows/*, docs/architecture/*, "
+        "docs/reports/*, and docs/benchmarks/*."
     )
     args_schema: Type[BaseModel] = ProjectFileWriteArgs
     project_root: str = Field(..., description="Absolute project root path.")

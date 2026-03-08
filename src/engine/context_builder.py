@@ -82,6 +82,18 @@ def _existing_paths(paths: list[Path]) -> list[str]:
     return [str(path) for path in paths if path.exists()]
 
 
+def _capability_mapping_lines() -> list[str]:
+    return [
+        "- workspace_file_read/workspace_file_write -> Read and write repository files under workspace root.",
+        "- project_root_file_read/project_root_file_write -> Maintain architecture/rules/reports/benchmark governance docs.",
+        "- run_tests/run_benchmarks -> Execute validation and performance verification commands.",
+        "- read_runtime_configuration/update_runtime_configuration -> Inspect and update active runtime .env keys.",
+        "- acknowledge_ui_action -> Mutate shared A2UI state at /ack_event_01/visibility.",
+        "- submit_objective -> Programmatically submit an objective/prompt into orchestration.",
+        "- complete_task -> Emit deterministic completion signal (success|partial|blocked).",
+    ]
+
+
 def _read_recent_execution_events(workspace: Path, max_events: int = 5) -> list[str]:
     log_file = workspace / ".agent" / "memory" / "execution_log.json"
     if not log_file.exists():
@@ -201,6 +213,16 @@ def build_orchestration_context_block(
     lines.append(
         "- Planning context sources: docs/architecture/*, docs/reports/*, docs/benchmarks/*"
     )
+    lines.append("")
+    lines.append("## Available Resources & Capabilities")
+    lines.append(
+        f"- Key files: {', '.join(notable_docs) if notable_docs else 'none detected'}"
+    )
+    lines.append(
+        f"- Actionable nouns: workspace files, architecture docs, reports, benchmarks, runtime config, tests, A2UI action state."
+    )
+    lines.append("- Tool-to-domain mapping:")
+    lines.extend(_capability_mapping_lines())
     lines.append("")
     lines.append("## Recent Execution Activity")
     lines.extend(_read_recent_execution_events(workspace))

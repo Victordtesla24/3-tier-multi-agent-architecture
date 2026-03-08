@@ -114,6 +114,10 @@ def test_context_builder_produces_required_sections(tmp_path):
 
     assert "## Environment Snapshot" in context
     assert "## Constraints & Preferences" in context
+    assert "## Available Resources & Capabilities" in context
+    assert "Tool-to-domain mapping" in context
+    assert "acknowledge_ui_action" in context
+    assert "submit_objective" in context
     assert "strict_provider_validation: True" in context
     assert "max_provider_4xx: 12" in context
     assert "## Recent Execution Activity" in context
@@ -254,15 +258,18 @@ def test_generate_improvement_proposal_ignores_missing_stage_durations(tmp_path)
 def test_project_root_tools_enforce_whitelist(tmp_path):
     project_root = tmp_path / "repo"
     (project_root / "docs" / "architecture").mkdir(parents=True)
+    (project_root / "docs" / "reports").mkdir(parents=True)
     reader = ProjectRootFileReadTool(project_root=str(project_root))
     writer = ProjectRootFileWriteTool(project_root=str(project_root))
 
     write_result = writer._run("docs/architecture/test.md", "ok")
     assert write_result == "Wrote docs/architecture/test.md"
     assert reader._run("docs/architecture/test.md") == "ok"
+    assert writer._run("docs/reports/allowed.md", "ok") == "Wrote docs/reports/allowed.md"
+    assert reader._run("docs/reports/allowed.md") == "ok"
 
     with pytest.raises(ValueError):
-        writer._run("docs/reports/forbidden.md", "nope")
+        writer._run("docs/private/forbidden.md", "nope")
 
 
 def test_health_tools_return_machine_readable_results(tmp_path):

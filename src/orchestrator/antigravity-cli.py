@@ -30,7 +30,7 @@ logger = logging.getLogger("AntigravityCLI")
 
 # Project root is always two levels up from this file (src/orchestrator/ → project root)
 PROJECT_ROOT = Path(__file__).parent.parent.parent.resolve()
-DEFAULT_WORKSPACE_ROOT = PROJECT_ROOT / "workspaces"
+DEFAULT_WORKSPACE_ROOT = PROJECT_ROOT
 
 
 class ArchitectureHealer:
@@ -76,7 +76,7 @@ def main() -> int:
         help=(
             "Working directory for pipeline artefacts. "
             "If omitted, uses ANTIGRAVITY_WORKSPACE_DIR or "
-            "<project_root>/workspaces/cli-default."
+            "<project_root>."
         ),
     )
     parser.add_argument(
@@ -110,7 +110,7 @@ def main() -> int:
             workspace = Path(env_workspace).resolve()
         else:
             root = Path(os.environ.get("ANTIGRAVITY_WORKSPACE_ROOT", DEFAULT_WORKSPACE_ROOT))
-            workspace = (root / "cli-default").resolve()
+            workspace = root.resolve()
 
     workspace.mkdir(parents=True, exist_ok=True)
 

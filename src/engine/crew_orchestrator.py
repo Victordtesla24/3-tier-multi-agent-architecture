@@ -19,10 +19,12 @@ from engine.llm_config import (
     classify_provider_error,
 )
 from engine.orchestration_tools import (
+    AcknowledgeUIActionTool,
     CompleteTaskTool,
     ReadRuntimeConfigTool,
     RunBenchmarksTool,
     RunTestsTool,
+    SubmitObjectiveTool,
     UpdateRuntimeConfigTool,
 )
 from engine.project_root_tools import ProjectRootFileReadTool, ProjectRootFileWriteTool
@@ -49,6 +51,27 @@ from engine.workspace_tools import WorkspaceFileReadTool, WorkspaceFileWriteTool
 _MODULE_PROJECT_ROOT = Path(__file__).parent.parent.parent.resolve()
 
 _telemetry_logger = logging.getLogger("AntigravityTelemetry")
+
+_GENERIC_WORKER_TOOL_ALIASES: dict[str, tuple[str, ...]] = {
+    "filesystem_read": ("project_root_file_read", "workspace_file_read"),
+    "file_read": ("project_root_file_read", "workspace_file_read"),
+    "read_file": ("project_root_file_read", "workspace_file_read"),
+    "filesystem_write": ("project_root_file_write", "workspace_file_write"),
+    "file_write": ("project_root_file_write", "workspace_file_write"),
+    "write_file": ("project_root_file_write", "workspace_file_write"),
+    "test_runner": ("run_tests",),
+    "pytest": ("run_tests",),
+    "benchmark_runner": ("run_benchmarks",),
+    "benchmark": ("run_benchmarks",),
+    "read_config": ("read_runtime_configuration",),
+    "runtime_config_read": ("read_runtime_configuration",),
+    "write_config": ("update_runtime_configuration",),
+    "runtime_config_write": ("update_runtime_configuration",),
+    "ack": ("acknowledge_ui_action",),
+    "acknowledge": ("acknowledge_ui_action",),
+    "submit_prompt": ("submit_objective",),
+    "submit_objective": ("submit_objective",),
+}
 
 
 def resolve_crewai_embedder_config() -> dict[str, Any] | None:
@@ -246,13 +269,120 @@ class CrewAIThreeTierOrchestrator:
     def _worker_tooling_manifest() -> str:
         return (
             "Tooling Manifest:\n"
-            "- workspace_file_read/workspace_file_write: read/write files under the active workspace only.\n"
+            "- workspace_file_read/workspace_file_write: read/write files under the active workspace (repo-root by default).\n"
             "- project_root_file_read/project_root_file_write: read/write only in "
-            ".agent/rules/*, .agent/workflows/*, docs/architecture/*.\n"
+            ".agent/rules/*, .agent/workflows/*, docs/architecture/*, docs/reports/*, "
+            "and docs/benchmarks/*.\n"
             "- run_tests/run_benchmarks: execute repository verification commands and return machine-readable output.\n"
             "- read_runtime_configuration/update_runtime_configuration: inspect or safely update runtime config.\n"
+            "- acknowledge_ui_action: mutate shared A2UI action state (e.g., /ack_event_01/visibility).\n"
+            "- submit_objective: submit a prompt/objective into the orchestration runtime.\n"
             "- complete_task: emit explicit completion signal with status success|partial|blocked."
         )
+
+    @staticmethod
+    def _normalise_required_tool_names(required_tools: list[str]) -> list[str]:
+        normalised: list[str] = []
+        seen: set[str] = set()
+        for raw_name in required_tools:
+            name = str(raw_name).strip()
+            if not name:
+                continue
+            candidates = _GENERIC_WORKER_TOOL_ALIASES.get(name.lower(), (name,))
+            for candidate in candidates:
+                if candidate in seen:
+                    continue
+                seen.add(candidate)
+                normalised.append(candidate)
+        return normalised
+
+    def _select_worker_tools_for_task(
+        self,
+        *,
+        task: WorkerTask,
+        worker_tools: list[Any],
+    ) -> list[Any]:
+        if not worker_tools:
+            return []
+
+        tools_by_name = {
+            str(getattr(tool, "name", "")).strip(): tool
+            for tool in worker_tools
+            if getattr(tool, "name", None)
+        }
+        minimal_default_names = (
+            "workspace_file_read",
+            "workspace_file_write",
+            "complete_task",
+        )
+        minimal_default = [
+            tools_by_name[name]
+            for name in minimal_default_names
+            if name in tools_by_name
+        ]
+
+        if not task.required_tools:
+            return minimal_default or worker_tools
+
+        selected = [
+            tools_by_name[name]
+            for name in self._normalise_required_tool_names(task.required_tools)
+            if name in tools_by_name
+        ]
+        return selected or minimal_default or worker_tools
+
+    @staticmethod
+    def _llm_model_id(llm: LLM) -> str:
+        return str(getattr(llm, "model", "")).strip()
+
+    @classmethod
+    def _is_ollama_llm(cls, llm: LLM) -> bool:
+        return cls._llm_model_id(llm).startswith("ollama/")
+
+    def _tool_safe_level3_tier(self) -> ModelTier:
+        candidate_pool = (
+            self.models.level1.primary,
+            self.models.orchestration.fallback,
+            self.models.orchestration.primary,
+            self.models.level1.fallback,
+            self.models.level2.primary,
+            self.models.level2.fallback,
+            self.models.level3.primary,
+            self.models.level3.fallback,
+        )
+
+        openai_candidates: list[LLM] = []
+        other_candidates: list[LLM] = []
+        seen_models: set[str] = set()
+        for llm in candidate_pool:
+            model_id = self._llm_model_id(llm)
+            if not model_id or model_id in seen_models or model_id.startswith("ollama/"):
+                continue
+            seen_models.add(model_id)
+            if model_id.startswith("openai/"):
+                openai_candidates.append(llm)
+            else:
+                other_candidates.append(llm)
+
+        # Prefer non-OpenAI tool-capable tiers first. CrewAI/LiteLLM currently
+        # sends stop semantics that GPT-5 family chat completions reject.
+        candidates = other_candidates + openai_candidates
+        if not candidates:
+            return self.models.level3
+
+        primary = candidates[0]
+        fallback = candidates[1] if len(candidates) > 1 else primary
+        return ModelTier(primary=primary, fallback=fallback)
+
+    def _select_task_graph_worker_tier(self, *, worker_tools: list[Any]) -> ModelTier:
+        if not worker_tools:
+            return self.models.level3
+        if not (
+            self._is_ollama_llm(self.models.level3.primary)
+            or self._is_ollama_llm(self.models.level3.fallback)
+        ):
+            return self.models.level3
+        return self._tool_safe_level3_tier()
 
     def _build_worker_tools(
         self, *, stage_name: str = "execution_hierarchical"
@@ -271,6 +401,8 @@ class CrewAIThreeTierOrchestrator:
                 workspace=str(self.workspace),
             ),
             UpdateRuntimeConfigTool(workspace=str(self.workspace)),
+            AcknowledgeUIActionTool(workspace=str(self.workspace)),
+            SubmitObjectiveTool(workspace=str(self.workspace)),
             CompleteTaskTool(),
         ]
         self._emit_telemetry(
@@ -520,6 +652,13 @@ class CrewAIThreeTierOrchestrator:
         context_block: str | None,
         worker_tools: list[Any],
     ) -> str:
+        selected_worker_tools = self._select_worker_tools_for_task(
+            task=task,
+            worker_tools=worker_tools,
+        )
+        execution_tier = self._select_task_graph_worker_tier(
+            worker_tools=selected_worker_tools,
+        )
         dependency_results = json.dumps(
             task_context.get("dependency_results", {}),
             indent=2,
@@ -535,7 +674,28 @@ class CrewAIThreeTierOrchestrator:
         previous_result = str(task_context.get("previous_result") or "None")
         qa_feedback = str(task_context.get("qa_feedback") or "None")
         required_tools = (
-            ", ".join(task.required_tools) if task.required_tools else "none"
+            ", ".join(
+                str(getattr(tool, "name", "")).strip()
+                for tool in selected_worker_tools
+                if getattr(tool, "name", None)
+            )
+            if selected_worker_tools
+            else "none"
+        )
+
+        self._emit_telemetry(
+            "TASK_GRAPH_WORKER_CONTEXT",
+            {
+                "task_id": task.task_id,
+                "requested_tools": list(task.required_tools),
+                "selected_tools": [
+                    str(getattr(tool, "name", "")).strip()
+                    for tool in selected_worker_tools
+                    if getattr(tool, "name", None)
+                ],
+                "worker_model_primary": self._llm_model_id(execution_tier.primary),
+                "worker_model_fallback": self._llm_model_id(execution_tier.fallback),
+            },
         )
 
         description = (
@@ -566,14 +726,14 @@ class CrewAIThreeTierOrchestrator:
                 ),
                 description=description,
                 expected_output="Concrete task-local output only.",
-                tools=worker_tools,
+                tools=selected_worker_tools or None,
                 max_reasoning_attempts=2,
             )
 
         return self._run_stage_with_tier_fallback(
             stage_name=f"task_execute_{task.task_id}",
             tier_name="level3",
-            tier=self.models.level3,
+            tier=execution_tier,
             runner=_runner,
         )
 

@@ -18,6 +18,28 @@ from pydantic import BaseModel, Field, ValidationError
 logger = logging.getLogger("A2UI_ViewAgent")
 logger.setLevel(logging.INFO)
 
+ACK_ACTION_ID = "ack_event_01"
+
+
+def acknowledgement_visibility_path(action_id: str = ACK_ACTION_ID) -> str:
+    """Canonical shared-state pointer for action acknowledgement visibility."""
+    return f"/{action_id}/visibility"
+
+
+def apply_acknowledgement_update(
+    data_model: Dict[str, Any],
+    *,
+    action_id: str = ACK_ACTION_ID,
+    acknowledged: bool = True,
+) -> Dict[str, Any]:
+    """
+    Primitive mutation used by both UI and agent tooling.
+    Acknowledged actions are hidden by setting visibility=false.
+    """
+    updated = dict(data_model)
+    updated[acknowledgement_visibility_path(action_id)] = not acknowledged
+    return updated
+
 
 class A2UIComponent(BaseModel):
     """
@@ -149,7 +171,7 @@ class A2UIViewAgent:
                 id="action_button",
                 props={
                     "label": "Acknowledge Completion",
-                    "actionId": "ack_event_01",
+                    "actionId": ACK_ACTION_ID,
                 },
             ),
         ]
@@ -162,7 +184,7 @@ class A2UIViewAgent:
         # 2. Construct and Yield the Data Model Update (State binding)
         data_model = DataModelUpdateMessage(
             surfaceId=self.surface_id,
-            data={"/ack_event_01/visibility": True},
+            data=apply_acknowledgement_update({}, action_id=ACK_ACTION_ID, acknowledged=False),
         )
         yield self._validate_and_serialize(data_model) + "\n"
 

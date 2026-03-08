@@ -58,9 +58,13 @@ def test_runtime_config_tools_are_bound_to_active_workspace(tmp_path):
 
     assert Path(read_payload["workspace"]) == workspace.resolve()
     assert "workspace" not in read_tool.args_schema.model_fields
+    assert "system_env" not in read_payload
 
-    with pytest.raises(TypeError):
-        read_tool._run(str(external_workspace))  # type: ignore[call-arg]
+    read_payload_with_system = literal_eval(read_tool._run(include_system_env=True))
+    assert "system_env" in read_payload_with_system
+
+    read_payload_positional = literal_eval(read_tool._run(True))
+    assert Path(read_payload_positional["workspace"]) == workspace.resolve()
 
     update_tool = UpdateRuntimeConfigTool(workspace=str(workspace))
     update_payload = literal_eval(
