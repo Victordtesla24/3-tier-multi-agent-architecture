@@ -1,0 +1,17 @@
+.agent/memory/
+.agent/tmp/
+.coverage
+.DS_Store
+.env
+.git
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.venv/
+ENV/
+env/
+htmlcov/
+node_modules/
+tmp/
+venv/
+workspaces/

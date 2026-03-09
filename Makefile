@@ -1,4 +1,4 @@
-.PHONY: install integrate-crewai ensure-venv test-audit test-pytest test-e2e test build run-cli benchmark clean
+.PHONY: install integrate-crewai ensure-venv audit-duplicates test-audit test-pytest test-e2e test build run-cli benchmark clean
 
 VENV_DIR ?= $(CURDIR)/.venv
 PYTHON_BIN ?= $(VENV_DIR)/bin/python
@@ -15,10 +15,13 @@ integrate-crewai:
 	chmod +x scripts/integrate_crewai.sh
 	./scripts/integrate_crewai.sh
 
+audit-duplicates: ensure-venv
+	PYTHONPATH=$(CURDIR)/src $(PYTHON_BIN) scripts/enforce_no_duplicates.py
+
 # Audits that the test collection contains a non-trivial number of tests.
 # Runs from the tests/ subdirectory to avoid macOS .DS_Store PermissionError
 # on /Users/Shared when chromadb/pydantic statically stat('.env') at import time.
-test-audit: ensure-venv
+test-audit: audit-duplicates
 	@echo "Auditing test collection..."
 	@cd tests && PYTHONPATH=$(CURDIR)/src $(PYTHON_BIN) -m pytest \
 		test_architecture.py test_crewai_integration.py test_contracts.py test_cli_runtime.py test_improvement_plan_workstreams.py test_orchestration_hardening.py \

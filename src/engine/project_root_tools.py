@@ -6,6 +6,8 @@ from typing import Type
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from engine.duplicate_guard import assert_no_duplicate_content
+
 
 _ALLOWED_PREFIXES = (
     ".agent/rules/",
@@ -79,6 +81,7 @@ class ProjectRootFileWriteTool(BaseTool):
     def _run(self, path: str, content: str) -> str:
         root = Path(self.project_root).resolve()
         file_path = _resolve_project_path(root, path)
+        assert_no_duplicate_content(root, path, content)
         file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.write_text(content, encoding="utf-8")
         return f"Wrote {path}"

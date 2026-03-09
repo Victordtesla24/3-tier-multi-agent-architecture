@@ -7,6 +7,8 @@ import re
 
 from crewai import LLM
 
+from engine.duplicate_guard import assert_no_duplicate_content
+
 
 def load_prompt_template(
     name: str,
@@ -152,6 +154,7 @@ def write_workspace_file(
     """
     workspace = workspace.resolve()
     target = (workspace / relative_path).resolve()
+    assert_no_duplicate_content(workspace, relative_path, content)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(content, encoding=encoding)
     return target
